@@ -1025,19 +1025,22 @@ def _apply_delays_live(changes: dict) -> dict:
 
 
 def api_save_config(body: dict):
-    name = str(body.get("name") or "").strip()
-    log_root = str(body.get("log_root") or "").strip()
     warnings = []
-    if name and "#" not in name:
-        warnings.append("建议填写完整战网昵称（含 #编号），否则可能无法识别己方玩家。")
-    if log_root and not os.path.isdir(log_root):
-        warnings.append("日志目录不存在，请确认路径正确（通常为炉石安装目录下的 Logs 文件夹）。")
     with CTRL.lock:
         if CTRL.automation_thread is not None and not _hot_requested(body):
             return {"ok": False, "error": "自动化运行中，请先停止后再修改配置。"}
         cfg = load_config()
-        cfg["name"] = name
-        cfg["log_root"] = log_root
+        # 只更新请求里实际提供的字段，避免只改 name 时把 log_root 清空（反之亦然）。
+        if "name" in body:
+            cfg["name"] = str(body.get("name") or "").strip()
+        if "log_root" in body:
+            cfg["log_root"] = str(body.get("log_root") or "").strip()
+        name = str(cfg.get("name") or "")
+        log_root = str(cfg.get("log_root") or "")
+        if "name" in body and name and "#" not in name:
+            warnings.append("建议填写完整战网昵称（含 #编号），否则可能无法识别己方玩家。")
+        if "log_root" in body and log_root and not os.path.isdir(log_root):
+            warnings.append("日志目录不存在，请确认路径正确（通常为炉石安装目录下的 Logs 文件夹）。")
         save_config(cfg)
         _apply_constants(name, log_root)
     _log("SYS", f"配置已保存：用户 {name or '（未填写）'}，日志目录 {log_root or '（未填写）'}")

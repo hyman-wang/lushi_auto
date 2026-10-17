@@ -47,9 +47,9 @@ class DependencyManifestTests(unittest.TestCase):
     def test_requirements_pins_are_parsed(self):
         pins = selfcheck._requirements_pins()
 
-        self.assertEqual("2.6.2", pins["paddlepaddle"])
+        self.assertEqual("3.10.0", pins["rapidocr"])
+        self.assertEqual("1.31.0", pins["onnxruntime"])
         self.assertEqual("2.5.2", pins["numpy"])
-        self.assertEqual("8.4.2", pins["click"])
 
     def test_manifest_covers_every_requirement(self):
         """requirements.txt 里每个包都要能在自检清单里看到（不许漏检）。"""
@@ -71,7 +71,7 @@ class DependencyManifestTests(unittest.TestCase):
         keys = {selfcheck._normalize(spec["dist"][0])
                 for spec in selfcheck.DEPENDENCIES}
 
-        for expected in ("paddlepaddle", "paddleocr", "pywin32", "numpy",
+        for expected in ("rapidocr", "onnxruntime", "pywin32", "numpy",
                          "opencv-python-headless", "pillow", "pynput",
                          "keyboard", "psutil", "requests"):
             self.assertIn(expected, keys)
@@ -85,14 +85,14 @@ class DependencyManifestTests(unittest.TestCase):
 class DependencyItemTests(unittest.TestCase):
     def test_missing_package_fails_with_pip_hint(self):
         def importer(name):
-            if name == "paddleocr":
-                raise ImportError("No module named 'paddleocr'")
+            if name == "rapidocr":
+                raise ImportError("No module named 'rapidocr'")
             return object()
 
         items = selfcheck.dependency_items(importer=importer,
                                           version_reader=lambda dists: "1.0",
                                           pins={})
-        item = next(i for i in items if i["key"] == "paddleocr")
+        item = next(i for i in items if i["key"] == "rapidocr")
 
         self.assertEqual(selfcheck.STATUS_FAIL, item["status"])
         self.assertIn("ImportError", item["detail"])
@@ -107,27 +107,6 @@ class DependencyItemTests(unittest.TestCase):
         self.assertEqual(selfcheck.STATUS_WARN, item["status"])
         self.assertIn("2.5.2", item["detail"])
         self.assertTrue(item["required"])
-
-    def test_click_is_checked_by_metadata_only(self):
-        """仓库自带的 click.py 会遮蔽第三方 click，所以只认发行包元数据。"""
-        items = selfcheck.dependency_items(importer=lambda name: object(),
-                                          version_reader=lambda dists: None,
-                                          pins={})
-        item = next(i for i in items if i["key"] == "click")
-
-        self.assertEqual(selfcheck.STATUS_FAIL, item["status"])
-        self.assertIn("click", item["detail"])
-
-    def test_optional_dependency_is_not_required(self):
-        items = selfcheck.dependency_items(
-            importer=lambda name: object(),
-            version_reader=lambda dists: (None if "setuptools" in dists else "1.0"),
-            pins={})
-        item = next(i for i in items if i["key"] == "setuptools")
-
-        self.assertEqual(selfcheck.STATUS_FAIL, item["status"])
-        self.assertFalse(item["required"])
-        self.assertIn("可选", item["hint"])
 
     def test_unreadable_version_is_only_a_warning(self):
         items = selfcheck.dependency_items(importer=lambda name: object(),
@@ -232,7 +211,7 @@ class RealEnvironmentTests(unittest.TestCase):
     def test_all_declared_dependencies_are_importable(self):
         failing = [i["label"] for i in self.result["items"]
                    if i["key"] in {"pywin32", "opencv-python-headless", "numpy",
-                                   "pillow", "paddleocr", "paddlepaddle"}
+                                   "pillow", "rapidocr", "onnxruntime"}
                    and i["status"] == selfcheck.STATUS_FAIL]
 
         self.assertEqual([], failing)

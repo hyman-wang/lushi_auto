@@ -419,9 +419,9 @@ python hsctl.py env --pin "<python.exe 路径>"   # 校验并**保存**到 log/e
 python hsctl.py env --pin auto     # 自动选第一个合格候选
 ```
 
-- **校验**：必须 Python **3.12.x**（3.13+ 装不上 OCR 轮子）且
-  `win32gui/cv2/numpy/PIL/paddleocr/paddle/psutil/keyboard/pynput/requests/click`
-  全部齐全。校验只 `find_spec`（**不 import**），所以不会把 paddle 拉起来。
+- **校验**：必须 Python **3.12.x**（项目实测基线；3.13+ 未验证）且
+  `win32gui/cv2/numpy/PIL/rapidocr/onnxruntime/psutil/keyboard/pynput/requests`
+  全部齐全。校验只 `find_spec`（**不 import**），所以不会把 OCR 引擎拉起来。
 - **解析顺序**：`HS_PYTHON` 环境变量 → `log/env.json` → 当前解释器（校验通过才用）
   → 候选探测（`CONDA_PREFIX` / `VIRTUAL_ENV` / 常见 conda 位置 / 仓库内 venv /
   `where python`）。

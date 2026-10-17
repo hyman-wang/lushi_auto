@@ -135,7 +135,7 @@ class VerifyPythonTests(unittest.TestCase):
         self.assertFalse(record["ok"])
 
     def test_probe_code_only_uses_the_standard_library(self):
-        """探针脚本不能 import 重依赖（否则校验会把 paddle 拉起来）。"""
+        """探针脚本不能 import 重依赖（否则校验会把 OCR 引擎拉起来）。"""
         self.assertNotIn("import cv2", hsctl._PROBE_CODE)
         self.assertIn("find_spec", hsctl._PROBE_CODE)
 

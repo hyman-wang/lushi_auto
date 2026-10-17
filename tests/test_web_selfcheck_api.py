@@ -222,7 +222,8 @@ class SelfcheckPageTests(unittest.TestCase):
 
     def test_page_spells_out_the_python_312_requirement(self):
         self.assertIn("Python 必须是 3.12", self.html)
-        self.assertIn("paddlepaddle", self.html)
+        self.assertIn("RapidOCR", self.html)
+        self.assertIn("ONNX Runtime", self.html)
 
     def test_banner_prompts_on_selfcheck_failure(self):
         self.assertIn("环境自检发现", self.html)

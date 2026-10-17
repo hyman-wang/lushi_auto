@@ -12,10 +12,10 @@
              炉石没开、日志目录里还没有 Power.log）；
     ❌ fail  必需项缺失/不满足，脚本很可能跑不起来或点了没反应，必须修。
 
-为什么死磕 Python 3.12：OCR 推理后端 paddlepaddle 2.6.2 只有 cp312 及以下的
-Windows 轮子（3.13+ 直接装不上），而本项目全部实测环境都是 3.12.14；
-3.11 及以下虽然装得上，但与本项目验证过的环境不一致，容易出玄学问题。
-所以这里把「3.12 + 64 位」作为唯一推荐值，其它版本一律 ❌ 并给出安装提示。
+为什么死磕 Python 3.12：本项目全部实测环境都是 3.12.14（Windows 64 位），
+OCR 依赖（RapidOCR + ONNX Runtime）也是在这个版本上验证的；3.13+ 未在实测
+范围内，3.11 及以下与验证环境不一致，容易出玄学问题。所以这里把
+「3.12 + 64 位」作为唯一推荐值，其它版本一律 ❌ 并给出安装提示。
 
 本模块只依赖标准库，导入它本身不会拉起 numpy/OCR 之类的重依赖
 （缺依赖时更要能跑起来报错，否则自检就成了「没装依赖就跑不了自检」）。
@@ -59,19 +59,14 @@ DEPENDENCIES: tuple[dict, ...] = (
      "why": "截图裁剪、颜色判定、OCR 预处理"},
     {"imports": ("numpy",), "dist": ("numpy",), "why": "截图像素解析"},
     {"imports": ("PIL",), "dist": ("Pillow",), "why": "截图（ImageGrab）"},
-    {"imports": ("paddleocr",), "dist": ("paddleocr",), "why": "盒子面板文字识别"},
-    {"imports": ("paddle",), "dist": ("paddlepaddle",),
-     "why": "OCR 推理后端（只有 Python 3.12 及以下有轮子）"},
+    {"imports": ("rapidocr",), "dist": ("rapidocr",),
+     "why": "盒子面板文字识别（PP-OCRv6 small）"},
+    {"imports": ("onnxruntime",), "dist": ("onnxruntime",),
+     "why": "OCR 推理后端（ONNX Runtime CPU）"},
     {"imports": ("psutil",), "dist": ("psutil",), "why": "炉石进程存活检测"},
     {"imports": ("keyboard",), "dist": ("keyboard",), "why": "Ctrl+Q 全局热键"},
     {"imports": ("pynput",), "dist": ("pynput",), "why": "鼠标移动与点击"},
     {"imports": ("requests",), "dist": ("Requests",), "why": "卡牌数据下载"},
-    # click 只按发行包版本检查：仓库根目录自己的 click.py 会遮蔽 PyPI 的 click，
-    # import click 找不到真正的第三方包（paddle/httpx 需要它，见 paddle_adapter）。
-    {"imports": (), "dist": ("click",), "metadata_only": True,
-     "why": "OCR 依赖链（paddle/httpx）用到的第三方 click"},
-    {"imports": (), "dist": ("setuptools",), "metadata_only": True,
-     "required": False, "why": "paddle 运行时用到的 pkg_resources"},
 )
 
 _PIN_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;]+)")
@@ -143,7 +138,7 @@ def python_item(version: Optional[tuple] = None,
         return _item("python", label, STATUS_FAIL, detail, PYTHON_HINT)
     if int(bits) != 64:
         return _item("python", label, STATUS_FAIL, detail,
-                     "32 位 Python 装不上 OCR 依赖（paddlepaddle 没有 32 位轮子），"
+                     "32 位 Python 装不上 OCR 依赖（onnxruntime 没有 32 位轮子），"
                      "请改装 64 位 Python 3.12。")
     return _item("python", label, STATUS_OK, detail)
 
@@ -285,26 +280,24 @@ def _load_ui_config() -> dict:
 
 
 def _ocr_model_item() -> dict:
-    """OCR 模型目录检查（缺了首次识别会自动下载，所以只算提示）。"""
-    purpose = "盒子面板文字识别用的 ppocrv4 模型"
+    """RapidOCR 内置模型检查（wheel 自带 PP-OCRv6 small，缺了只需重装）。"""
+    purpose = "盒子面板文字识别用的 PP-OCRv6 small 模型"
     try:
-        from config import OCR_MODEL_ROOT
-        root = Path(OCR_MODEL_ROOT)
-    except Exception:
-        return _item("ocr-model", "OCR 模型目录", STATUS_WARN,
-                     "无法解析模型目录配置", "", False, purpose)
-    if not root.is_dir():
-        return _item("ocr-model", "OCR 模型目录", STATUS_WARN,
-                     f"还没下载：{root}",
-                     "第一次识别时会自动下载；也可用环境变量 "
-                     "HS_OCR_MODEL_ROOT 指向已有模型目录。", False, purpose)
-    models = [p.name for p in root.iterdir() if p.is_dir()]
-    if not models:
-        return _item("ocr-model", "OCR 模型目录", STATUS_WARN,
-                     f"{root} 里没有模型子目录",
-                     "第一次识别时会自动下载模型。", False, purpose)
-    return _item("ocr-model", "OCR 模型目录", STATUS_OK,
-                 f"{root}（{len(models)} 个模型）", "", False, purpose)
+        import rapidocr
+        root = Path(rapidocr.__file__).resolve().parent / "models"
+    except Exception as exc:
+        return _item("ocr-model", "OCR 模型", STATUS_WARN,
+                     f"无法定位 RapidOCR 内置模型：{type(exc).__name__}",
+                     "先安装 rapidocr（wheel 自带模型）。", False, purpose)
+    expected = ("PP-OCRv6_det_small.onnx", "PP-OCRv6_rec_small.onnx")
+    missing = [name for name in expected if not (root / name).is_file()]
+    if missing:
+        return _item("ocr-model", "OCR 模型", STATUS_WARN,
+                     f"缺少 {len(missing)} 个：{', '.join(missing)}",
+                     "重新安装 rapidocr（模型随 wheel 分发）。", False, purpose)
+    return _item("ocr-model", "OCR 模型", STATUS_OK,
+                 f"RapidOCR 内置 PP-OCRv6 small（{len(expected)} 个模型）",
+                 "", False, purpose)
 
 
 def _log_dir_item() -> dict:

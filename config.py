@@ -524,16 +524,6 @@ JSON_URL = _env("HS_JSON_URL",
 # 经 HS_DOWNLOAD_TIMEOUT_SECONDS 覆盖。
 DOWNLOAD_TIMEOUT_SECONDS = int(_env("HS_DOWNLOAD_TIMEOUT_SECONDS", "30"))
 
-# ---------------------------------------------------------------- OCR 模型目录
-# PaddleOCR 模型所在目录（det/rec/cls 三个 ppocrv4 子模型）。
-# 用于：PaddleOcrAdapter.load() 加载模型；缺模型会报 OCR 不可用。
-# 来源优先级：环境变量 HS_OCR_MODEL_ROOT >
-#             %LOCALAPPDATA%/AutoHS/ocr_models/paddleocr（默认自动探测）。
-OCR_MODEL_ROOT = os.environ.get("HS_OCR_MODEL_ROOT") or os.path.normpath(
-    os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
-                 "AutoHS", "ocr_models", "paddleocr"))
-
-
 # ---------------------------------------------------------------- 推荐自动化调优
 # 校准工具可以写回 ui_config.json 的区域键白名单（同时是 RecommendationConfig
 # 的字段名）。新增一个可校准区域时，这里和 screen_regions.CALIBRATION_TARGETS
@@ -818,10 +808,10 @@ class RecommendationConfig:
     result_timeout_seconds: float = 5.0
 
     # ------------------------------------------------------------------ OCR
-    # 预处理缩放倍数：1.5x 是实测识别精度/速度最佳点
-    # （1.0x 快约 28% 但识别率下降不可接受；3.0x 无效且慢）。
-    # 上游取 1.4；仍可用环境变量 OCR_PREPROCESS_SCALE 临时覆盖。
-    ocr_preprocess_scale: float = 1.4
+    # 预处理缩放倍数：PP-OCRv6 对原生尺寸的小字更稳；实测 1.0x 比 1.4x
+    # 更准且不慢（1.4x 会把面板放大到检测上限之上，反而引入噪声）。
+    # 仍可用环境变量 OCR_PREPROCESS_SCALE 临时覆盖。
+    ocr_preprocess_scale: float = 1.0
     # 自动线程数下限：OpenMP/MKL 线程默认取机器物理核数，
     # 低于此下限固定为此值（核数少的机器保守）。
     ocr_thread_min: int = 4

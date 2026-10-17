@@ -75,7 +75,7 @@ EXIT_UNREACHABLE = 3
 EXIT_ENV = 4
 
 # --------------------------------------------------------------------- 运行环境
-# 为什么有这一整块：这个项目**必须**跑在 Python 3.12 + 那一堆 win32/cv2/paddle 依赖上，
+# 为什么有这一整块：这个项目**必须**跑在 Python 3.12 + 那一堆 win32/cv2/OCR 依赖上，
 # 而每台机器、每个 agent 自带的 python 都不同 —— 把某一台机器的路径写进代码/默认值
 # 一定会在别的机器上翻车。所以这里的做法是：
 #   1) 仓库里放 `log/env.example.json`（只有占位符与说明，**不含任何本机路径**）；
@@ -86,14 +86,14 @@ ENV_FILE = ROOT / "log" / "env.json"
 # 模板放在仓库根、并显式加进版本库（log/ 整个目录被忽略，里面放不了"要提交的"模板）。
 ENV_TEMPLATE = ROOT / "env.example.json"
 # 解释器校验：3.12.x + 这些模块必须**存在**（只 find_spec，不 import —— 不拉重依赖）。
-REQUIRED_MODULES = ("win32gui", "cv2", "numpy", "PIL", "paddleocr",
-                    "paddle", "psutil", "keyboard", "pynput", "requests", "click")
+REQUIRED_MODULES = ("win32gui", "cv2", "numpy", "PIL", "rapidocr",
+                    "onnxruntime", "psutil", "keyboard", "pynput", "requests")
 # 模块名 → pip 包名（只用于给用户/agent 打印"缺哪个包该装什么"）。
 MODULE_PACKAGES = {
     "win32gui": "pywin32", "cv2": "opencv_python_headless", "PIL": "Pillow",
-    "paddleocr": "paddleocr", "paddle": "paddlepaddle", "psutil": "psutil",
+    "rapidocr": "rapidocr", "onnxruntime": "onnxruntime", "psutil": "psutil",
     "keyboard": "keyboard", "pynput": "pynput", "requests": "Requests",
-    "click": "click", "numpy": "numpy",
+    "numpy": "numpy",
 }
 EXPECTED_PYTHON = (3, 12)
 PROBE_TIMEOUT = 60.0

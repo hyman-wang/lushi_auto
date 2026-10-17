@@ -443,9 +443,9 @@ python hsctl.py serve task-status      # 看有没有现成的「最高权限」
 
 ### 8.1 控制台跑在错误的 Python 上（自检"全部依赖 fail"）
 
-**症状**：`status` 里 `selfcheck.failed` 等于全部依赖数（pywin32/cv2/numpy/PIL/paddle…
+**症状**：`status` 里 `selfcheck.failed` 等于全部依赖数（pywin32/cv2/numpy/PIL/rapidocr/onnxruntime…
 一整排 `ModuleNotFoundError`），且 `selfcheck.executable` 指向的解释器版本不对
-（本项目要求 3.12，3.13+ 装不上 OCR 的轮子）。
+（本项目要求 3.12，3.13+ 未在实测范围内）。
 
 **先做这一件事**（大概率一条命令就够）：
 

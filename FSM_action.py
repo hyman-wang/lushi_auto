@@ -25,7 +25,7 @@ from src.flow.recommendation_flow import (
     FlowStepStatus, RecommendationFlow,
 )
 from src.game_state.recommendation_adapter import adapt_action
-from src.ocr.paddle_adapter import PaddleOcrAdapter
+from src.ocr.rapid_adapter import RapidOcrAdapter
 from src.ocr.stable_reader import StableRecommendationReader
 from src.parser.recommendation_parser import RecommendationParser
 from src.recommendation_config import RecommendationConfig
@@ -131,7 +131,7 @@ def initialize_recommendation_automation():
     每次调用都会重新读取 ui_config.json 的 recommendation_roi（重建轻量的
     RecommendationConfig + DesktopCapture），因此用校准工具画完框后，直接重开
     对局/重启自动化即可生效，无需重启 web_ui。昂贵的 OCR 引擎（reader 与
-    paddle backend）仍只创建一次、跨对局复用。
+    RapidOCR backend）仍只创建一次、跨对局复用。
     """
     global auto_mulligan_flow, recommendation_flow
     global recommendation_config, recommendation_capture
@@ -147,7 +147,7 @@ def initialize_recommendation_automation():
 
     if recommendation_reader is None:
         recommendation_reader = StableRecommendationReader(
-            recommendation_config, PaddleOcrAdapter(),
+            recommendation_config, RapidOcrAdapter(),
             text_normalizer=recommendation_parser.normalize_action_text)
         # 不设"打法参考A"信标：对战时该标题不在截图区域内（实测
         # 面板直出「打出N号位…」指令文本），设信标会把正确指令清空为

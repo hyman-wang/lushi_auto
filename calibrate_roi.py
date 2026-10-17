@@ -725,10 +725,10 @@ class CalibrationSession:
     def _ocr_worker(self) -> None:
         try:
             import numpy as np
-            from src.ocr.paddle_adapter import PaddleOcrAdapter
+            from src.ocr.rapid_adapter import RapidOcrAdapter
             from src.ocr.preprocess import iter_preprocess_recommendation
 
-            adapter = PaddleOcrAdapter()
+            adapter = RapidOcrAdapter()
             while self.running:
                 self.crop_event.wait(timeout=5.0)
                 self.crop_event.clear()

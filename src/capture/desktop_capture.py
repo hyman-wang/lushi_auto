@@ -136,6 +136,20 @@ class DesktopCapture:
         return (bottom - top, right - left)
 
     def _is_roi_frame(self, width: int, height: int) -> bool:
+        """判断一帧是不是"只抓了推荐面板 ROI"的小图。
+
+        ROI 抓图走 box_to_screen 换算成屏幕物理坐标，客户区不是基准 1920×1080
+        时物理尺寸 ≠ 逻辑 ROI 尺寸（如 2560×1440 客户区下 195×300 → 261×401），
+        必须按**换算后的物理框尺寸**比；拿不到几何（display_mapping 为 None）时
+        box_to_screen 原样返回，物理=逻辑，退回逻辑尺寸比较（零回归）。
+        """
+        try:
+            left, top, right, bottom = self._screen_roi_box()
+        except Exception:
+            pass
+        else:
+            if right > left and bottom > top:
+                return (width, height) == (right - left, bottom - top)
         roi_height, roi_width = self._roi_size
         return (width, height) == (roi_width, roi_height)
 

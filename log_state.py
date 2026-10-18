@@ -14,7 +14,7 @@ _MY_PLAYER_SWAP_WARNED = False
 def check_name():
     global MY_NAME
     if MY_NAME == "ChangeThis#54321":
-        MY_NAME = input("请输入你的炉石用户名, 例子: \"为所欲为、异灵术#54321\" (不用输入引号!)\n").strip()
+        MY_NAME = input("请输入你的炉石用户名, 例子: \"你的昵称#12345\" (不用输入引号!)\n").strip()
 
 
 # 日志里用来表示“名字不可见”的占位名：不能拿它当玩家真名来比对。

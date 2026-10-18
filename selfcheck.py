@@ -283,7 +283,7 @@ def _log_dir_item() -> dict:
     if not raw:
         return _item("log-root", "炉石日志目录", STATUS_FAIL, "还没填写",
                      "在「👤 基础配置」里填 Logs 文件夹，例如 "
-                     "D:\\Battle.net\\Hearthstone\\Logs。", True, purpose)
+                     "D:\\Hearthstone\\Logs。", True, purpose)
     path = Path(raw)
     if not path.is_dir():
         return _item("log-root", "炉石日志目录", STATUS_FAIL,

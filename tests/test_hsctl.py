@@ -70,7 +70,7 @@ STATUS_FIXTURE = {
                  "log_stale_warn_seconds": 120.0,
                  "log_stale_stop_seconds": 300.0},
     "liveness_alert": None,
-    "name_match": {"config": "Priscilla#51346", "players": {}, "matched": True},
+    "name_match": {"config": "Player#12345", "players": {}, "matched": True},
     "delays": {
         "mulligan_ready_delay_seconds": 20.0,
         "mulligan_post_ocr_delay_seconds": 1.0,
@@ -84,8 +84,8 @@ STATUS_FIXTURE = {
     "selfcheck": {"checked": True, "ok": True, "failed": 0, "warned": 0,
                   "summary": "全部通过", "checked_at": "2026-05-30T22:30:00",
                   "python": "3.12.14"},
-    "config": {"name": "Priscilla#51346",
-               "log_root": "D:\\Battle.net\\Hearthstone\\Logs"},
+    "config": {"name": "Player#12345",
+               "log_root": "D:\\Hearthstone\\Logs"},
     "last_error": None,
     "last_summary": None,
     "hotkey_ok": True,
@@ -176,7 +176,7 @@ class CliTests(unittest.TestCase):
     def test_status_human_render(self):
         code, out, _ = run_cli([*self._base(), "status"])
         self.assertEqual(code, hsctl.EXIT_OK)
-        for expect in ("运行中", "Priscilla#51346", "匹配", "12 场 8 胜",
+        for expect in ("运行中", "Player#12345", "匹配", "12 场 8 胜",
                        "自动投降", "活人感", "延时", "自检"):
             self.assertIn(expect, out)
 

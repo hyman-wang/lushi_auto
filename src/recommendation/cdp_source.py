@@ -73,6 +73,7 @@ HOOK_JS = r"""
 
 _READ_JS = (
     "JSON.stringify({"
+    "h: !!window.__boxHooked,"
     "v: (window.__boxRec && window.__boxRec.ts) || 0,"
     "p: (window.__boxRec && window.__boxRec.parsed) || null"
     "})"
@@ -268,15 +269,21 @@ class CdpRecommendationSource:
     """从盒子 CEF 页面读取推荐快照；断线自动重连。"""
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
-                 timeout: float = 2.0, retry_interval: float = 1.0):
+                 timeout: float = 2.0, retry_interval: float = 1.0,
+                 target_check_interval: float = 2.0):
         self.host = host
         self.port = port
         self.timeout = timeout
         self.retry_interval = retry_interval
+        # 空闲时可能先连到 analysis/client-home；进对局后 ladder-opp 才出现，
+        # 所以每隔几秒重扫一次 target，发现更好的页面就切过去。
+        self.target_check_interval = target_check_interval
         self.last_error: Optional[str] = None
         self._cdp: Optional[_Cdp] = None
         self._target_url: Optional[str] = None
+        self._ws_url: Optional[str] = None
         self._next_retry_at = 0.0
+        self._last_target_check = 0.0
 
     # -- public ---------------------------------------------------------
     def snapshot(self) -> Optional[RecommendationSnapshot]:
@@ -284,10 +291,16 @@ class CdpRecommendationSource:
             return None
         for attempt in range(2):
             try:
+                self._refresh_target()
                 if self._cdp is None:
                     self._connect()
                 raw = self._cdp.evaluate(_READ_JS, timeout=self.timeout)
                 data = json.loads(raw) if raw else {}
+                if not data.get("h"):
+                    # 页面导航/刷新后 hook 丢了，补挂一次。
+                    self._cdp.evaluate(HOOK_JS, timeout=self.timeout)
+                    raw = self._cdp.evaluate(_READ_JS, timeout=self.timeout)
+                    data = json.loads(raw) if raw else {}
                 version = int(data.get("v") or 0)
                 payload = data.get("p")
                 if version <= 0 or not isinstance(payload, dict):
@@ -319,6 +332,22 @@ class CdpRecommendationSource:
                 pass
         self._cdp = None
         self._target_url = None
+        self._ws_url = None
+
+    def _refresh_target(self) -> None:
+        """空闲时连的可能是 analysis；进对局后出现 ladder-opp 就切过去。"""
+        now = time.time()
+        if now - self._last_target_check < self.target_check_interval:
+            return
+        self._last_target_check = now
+        if self._cdp is None:
+            return
+        try:
+            best = self._pick_target(self._targets())
+        except Exception:
+            return
+        if best.get("webSocketDebuggerUrl") != self._ws_url:
+            self._reset()
 
     def _targets(self) -> list:
         url = f"http://{self.host}:{self.port}/json/list"
@@ -348,3 +377,4 @@ class CdpRecommendationSource:
             raise
         self._cdp = cdp
         self._target_url = target.get("url")
+        self._ws_url = target["webSocketDebuggerUrl"]

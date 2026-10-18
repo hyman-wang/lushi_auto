@@ -130,7 +130,7 @@ python hsctl.py stop                  # 立即停
 | 6 | 开打 | `start` |
 
 ```powershell
-Start-Process 'D:\炉石传说盒子\HSAng.exe'    # ① 盒子（进程名 HSAng.exe）
+Start-Process 'D:\炉石传说盒子\HSAng.exe' -ArgumentList '--remote-debugging-port=9222' -Verb RunAs  # ① 盒子（必须带调试端口，推荐走 CEF JSON）
 python hsctl.py serve start --via-task        # ② 控制台：提权、不弹 UAC
 python hsctl.py restart-hearthstone --yes     # ③ 战网启动器 → 炉石
 python hsctl.py enter-battle --deck 8         # ④ 认界面：点「传统对战」→ 选第 8 副卡组

@@ -28,7 +28,7 @@ from src.game_state.recommendation_adapter import (
     RecommendationStateError,
     adapt_action,
 )
-from src.parser.recommendation_parser import RecommendationParser
+from tests.support.recommendation_parser import RecommendationParser
 from src.recommendation_models import ActionKind, SlotRef
 
 # cards.json 里「选择你手牌中的一张…」的随从（当前共 14 张），

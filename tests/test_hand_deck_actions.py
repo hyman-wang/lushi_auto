@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from src.parser.recommendation_parser import (
+from tests.support.recommendation_parser import (
     RecommendationParseError,
     RecommendationParser,
 )

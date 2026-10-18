@@ -69,19 +69,16 @@ class MulliganTimingTests(unittest.TestCase):
             "auto_mulligan_flow",
             "recommendation_flow",
             "recommendation_config",
-            "recommendation_capture",
-            "recommendation_parser",
-            "recommendation_reader",
-            "mulligan_reader",
+            "recommendation_source",
+            "ocr_backend",
             "recommendation_validator",
         )
         originals = {name: getattr(FSM_action, name) for name in names}
         try:
             # Pre-populate the expensive OCR collaborators: initialization
             # only needs to wire them into the production flow for this test.
-            FSM_action.recommendation_parser = object()
-            FSM_action.recommendation_reader = object()
-            FSM_action.mulligan_reader = object()
+            FSM_action.recommendation_source = object()
+            FSM_action.ocr_backend = object()
             FSM_action.recommendation_validator = object()
 
             FSM_action.initialize_recommendation_automation()

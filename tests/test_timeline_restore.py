@@ -7,7 +7,7 @@ import click as hearthstone_click
 from log_op import parse_line
 from log_state import LogState, update_state
 from manual_controller import ManualController, ClickExecutor
-from src.parser.recommendation_parser import RecommendationParser
+from tests.support.recommendation_parser import RecommendationParser
 from src.game_state.recommendation_adapter import adapt_action
 from strategy import StrategyState
 

@@ -14,7 +14,7 @@ from manual_controller import ActionExecutionResult, EndTurnAction
 from src.flow.mulligan_flow import MulliganFlow, MulliganStatus
 from src.flow.recommendation_flow import FlowStepStatus, RecommendationFlow
 from src.game_state.recommendation_adapter import adapt_action
-from src.parser.recommendation_parser import RecommendationParser
+from tests.support.recommendation_parser import RecommendationParser
 from src.recommendation_models import (
     ActionKind, FrameEvidence, OcrEvidence,
 )
@@ -75,15 +75,16 @@ class RecordingController:
 
 class RecommendationPauseTests(unittest.TestCase):
     def _run(self, hook):
-        active = SimpleNamespace(is_my_turn=True, game_num_turns_in_play=3)
-        ended = SimpleNamespace(is_my_turn=False, game_num_turns_in_play=4)
-        states = iter(((active, 10), (active, 10), (ended, 11)))
+        from src.recommendation.mapper import payload_to_action
+        from tests.support.recommendation_stubs import FakeSource, payload
+
+        active = SimpleNamespace(
+            is_my_turn=True, game_num_turns_in_play=3, hand_entry_count=0)
         sleeps = []
         flow = RecommendationFlow(
-            capture=SequencedCapture(),
-            reader=SequencedReader(),
-            parser=RecommendationParser(),
-            state_supplier=lambda: next(states),
+            source=FakeSource(payload("end_turn"), bump_after=2),
+            mapper=payload_to_action,
+            state_supplier=lambda: (active, 10),
             adapter=adapt_action,
             validator=RecommendationValidator(),
             controller=RecordingController(),
@@ -91,10 +92,6 @@ class RecommendationPauseTests(unittest.TestCase):
             post_action_delay=0.2,
             post_action_pause=hook,
         )
-        flow.waiting_instruction = "结束回合"
-        flow.waiting_panel_hash = "0" * 64
-        flow.waiting_turn_number = 3
-        flow.waiting_action_kind = ActionKind.END_TURN
         result = flow.run_player_turn_step()
         return result, sleeps
 

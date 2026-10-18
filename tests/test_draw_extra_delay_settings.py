@@ -37,14 +37,14 @@ class ConfigTests(unittest.TestCase):
 class FlowDefaultTests(unittest.TestCase):
     def test_flow_defaults_to_disabled_for_library_callers(self):
         flow = RecommendationFlow(
-            capture=None, reader=None, parser=None, state_supplier=None,
+            source=None, mapper=None, state_supplier=None,
             adapter=None, validator=None, controller=None)
 
         self.assertEqual(0.0, flow.draw_extra_delay_per_card)
 
     def test_flow_takes_the_configured_seconds(self):
         flow = RecommendationFlow(
-            capture=None, reader=None, parser=None, state_supplier=None,
+            source=None, mapper=None, state_supplier=None,
             adapter=None, validator=None, controller=None,
             draw_extra_delay_per_card=2.5)
 
@@ -55,8 +55,7 @@ class FsmWiringTests(unittest.TestCase):
     def test_production_flow_gets_the_configured_draw_delay(self):
         """initialize_recommendation_automation() 必须把配置传进流程。"""
         names = ("recommendation_flow", "recommendation_config",
-                 "recommendation_capture", "recommendation_parser",
-                 "recommendation_reader", "mulligan_reader",
+                 "recommendation_source", "ocr_backend",
                  "recommendation_validator")
         originals = {name: getattr(FSM_action, name) for name in names}
 
@@ -70,9 +69,8 @@ class FsmWiringTests(unittest.TestCase):
                 draw_extra_delay_per_card_seconds=1.5)
 
         try:
-            FSM_action.recommendation_parser = object()
-            FSM_action.recommendation_reader = object()
-            FSM_action.mulligan_reader = object()
+            FSM_action.recommendation_source = object()
+            FSM_action.ocr_backend = object()
             FSM_action.recommendation_validator = object()
             with patch.object(FSM_action, "RecommendationConfig", stub_config):
                 FSM_action.initialize_recommendation_automation()

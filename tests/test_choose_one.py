@@ -8,8 +8,7 @@ from log_op import parse_line
 from log_state import LogState, update_state
 from manual_controller import ClickExecutor, ManualController, DiscoverChoiceAction
 from src.game_state.recommendation_adapter import adapt_action, RecommendationStateError
-from src.ocr.stable_reader import StableRecommendationReader
-from src.parser.recommendation_parser import RecommendationParser
+from tests.support.recommendation_parser import RecommendationParser
 from src.recommendation_models import OcrEvidence, OcrLine
 
 
@@ -231,15 +230,6 @@ class ChooseOneTests(unittest.TestCase):
         self.assertEqual(DiscoverChoiceAction(1, 3, choice_entity_id='154',
                                              choice_parent_entity_id='152'), manual)
 
-    def test_choice_name_participates_in_ocr_confidence_and_stability(self):
-        reader = StableRecommendationReader(SimpleNamespace(min_ocr_confidence=.9), None,
-            text_normalizer=RecommendationParser.normalize_action_text)
-        evidence = OcrEvidence('frame', 0, tuple(OcrLine(t, c) for t, c in (
-            ('使用英雄技能', .99), ('培育', .99), ('选择卡牌', .99), ('冰雪绽放', .5))),
-            '使用英雄技能\n培育\n选择卡牌\n冰雪绽放', .99, 'test', 'test')
-        result = reader._action_evidence(evidence)
-        self.assertEqual('使用英雄技能\n选择卡牌\n冰雪绽放', result.normalized_text)
-        self.assertEqual(.5, result.confidence)
 
 
 if __name__ == '__main__':

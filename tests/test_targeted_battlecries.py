@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from manual_controller import ClickExecutor, ManualController
 from src.game_state.recommendation_adapter import adapt_action, RecommendationStateError
-from src.parser.recommendation_parser import RecommendationParser, RecommendationParseError
+from tests.support.recommendation_parser import RecommendationParser, RecommendationParseError
 
 
 class RecordingClicks:

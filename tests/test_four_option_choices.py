@@ -9,7 +9,7 @@ from log_state import LogState, update_state
 from manual_controller import ClickExecutor, ManualController
 from src.flow.recommendation_flow import RecommendationFlow
 from src.game_state.recommendation_adapter import adapt_action, RecommendationStateError
-from src.parser.recommendation_parser import RecommendationParser
+from tests.support.recommendation_parser import RecommendationParser
 
 
 class FourOptionChoiceTests(unittest.TestCase):

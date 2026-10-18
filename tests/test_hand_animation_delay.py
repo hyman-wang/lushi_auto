@@ -1,13 +1,13 @@
+import time
 import unittest
 from types import SimpleNamespace
-import time
 
 from manual_controller import ActionExecutionResult
 from src.flow.recommendation_flow import FlowStepStatus, RecommendationFlow
 from src.game_state.recommendation_adapter import adapt_action
-from src.parser.recommendation_parser import RecommendationParser
-from src.recommendation_models import FrameEvidence, OcrEvidence
+from src.recommendation.mapper import payload_to_action
 from src.safety.recommendation_validator import RecommendationValidator
+from tests.support.recommendation_stubs import FakeSource, payload
 
 
 class FakeClock:
@@ -24,9 +24,8 @@ class FakeClock:
 class HandAnimationDelayTests(unittest.TestCase):
     def test_flow_uses_monotonic_clock_by_default(self):
         flow = RecommendationFlow(
-            capture=None,
-            reader=None,
-            parser=None,
+            source=None,
+            mapper=None,
             state_supplier=None,
             adapter=None,
             validator=None,
@@ -37,10 +36,8 @@ class HandAnimationDelayTests(unittest.TestCase):
         self.assertIs(time.monotonic, flow.hand_animation_delay.clock)
 
     def test_each_new_hand_entity_extends_deadline_by_one_second(self):
-        try:
-            from src.flow.hand_animation_delay import HandAnimationDelay
-        except ImportError as exc:
-            self.fail(f"hand animation delay is missing: {exc}")
+        from src.flow.hand_animation_delay import HandAnimationDelay
+
         clock = FakeClock()
         delay = HandAnimationDelay(clock=clock)
 
@@ -68,70 +65,6 @@ class HandAnimationDelayTests(unittest.TestCase):
         self.assertEqual(0.0, delay.remaining())
 
     def test_flow_waits_one_second_per_new_hand_entity_before_clicking(self):
-        def frame(frame_id, exact_hash):
-            return FrameEvidence(
-                frame_id=frame_id,
-                captured_at=0.0,
-                desktop_size=(1920, 1080),
-                dpi=96,
-                window_handle=1,
-                foreground=True,
-                recommendation_roi=(7, 32, 278, 970),
-                exact_hash=exact_hash,
-                perceptual_hash="0" * 64,
-                panel_visible=True,
-            )
-
-        def evidence(frame_id):
-            return OcrEvidence(
-                frame_id=frame_id,
-                created_at=0.0,
-                lines=(),
-                normalized_text="结束回合",
-                confidence=0.90,
-                backend="test",
-                preprocessing="test",
-            )
-
-        class Capture:
-            def __init__(self):
-                self.frames = iter((
-                    frame("stable", "before"),
-                    frame("current", "before"),
-                    frame("after", "after"),
-                ))
-
-            def capture(self, ocr_panel_ok=False):
-                return next(self.frames)
-
-            @staticmethod
-            def crop_recommendation(current_frame):
-                return current_frame
-
-        class Reader:
-            def __init__(self):
-                self.read_count = 0
-
-            def read(self, frame_supplier, _roi_supplier):
-                current_frame = frame_supplier()
-                self.read_count += 1
-                current_evidence = evidence(current_frame.frame_id)
-                if self.read_count == 1:
-                    return current_evidence
-                return OcrEvidence(
-                    frame_id=current_evidence.frame_id,
-                    created_at=0.0,
-                    lines=(),
-                    normalized_text="等待对手操作",
-                    confidence=0.90,
-                    backend="test",
-                    preprocessing="test",
-                )
-
-            @staticmethod
-            def read_frame(current_frame, _roi_supplier):
-                return evidence(current_frame.frame_id)
-
         clock = FakeClock()
         active = SimpleNamespace(
             is_my_turn=True,
@@ -139,18 +72,6 @@ class HandAnimationDelayTests(unittest.TestCase):
             my_hand_cards=[],
             hand_entry_count=12,
         )
-        ended = SimpleNamespace(
-            is_my_turn=False,
-            game_num_turns_in_play=4,
-            my_hand_cards=active.my_hand_cards,
-            hand_entry_count=active.hand_entry_count,
-        )
-        states = iter((
-            (active, 10),
-            (active, 10),
-            (active, 10),
-            (ended, 11),
-        ))
         events = []
 
         def sleep(seconds):
@@ -164,23 +85,18 @@ class HandAnimationDelayTests(unittest.TestCase):
                 events.append(("execute",))
                 return ActionExecutionResult(True, "executed")
 
-        try:
-            flow = RecommendationFlow(
-                capture=Capture(),
-                reader=Reader(),
-                parser=RecommendationParser(),
-                state_supplier=lambda: next(states),
-                adapter=adapt_action,
-                validator=RecommendationValidator(),
-                controller=Controller(),
-                sleep=sleep,
-                clock=clock,
-            )
-        except TypeError as exc:
-            self.fail(f"flow cannot receive the hand animation delay: {exc}")
+        flow = RecommendationFlow(
+            source=FakeSource(payload("end_turn"), bump_after=2),
+            mapper=payload_to_action,
+            state_supplier=lambda: (active, 10),
+            adapter=adapt_action,
+            validator=RecommendationValidator(),
+            controller=Controller(),
+            sleep=sleep,
+            clock=clock,
+        )
 
-        # The first observation is a historical baseline. Two later entries
-        # must be delayed even though the hand's final entity set is irrelevant.
+        # 第一次 observe 是历史基线；之后多出来的 2 张牌各等 1 秒。
         flow.hand_animation_delay.observe(10)
 
         result = flow.run_player_turn_step()

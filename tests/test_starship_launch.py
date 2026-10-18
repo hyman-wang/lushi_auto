@@ -29,7 +29,7 @@ from src.game_state.starship import (
     is_starship_card,
     starship_card_ids,
 )
-from src.parser.recommendation_parser import (
+from tests.support.recommendation_parser import (
     RecommendationParseError,
     RecommendationParser,
 )

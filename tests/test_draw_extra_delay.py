@@ -235,64 +235,17 @@ class OpponentAndResetTests(unittest.TestCase):
 class FlowIntegrationTests(unittest.TestCase):
     """整条流程跑一遍：出牌后抽到 2 张 → 真的多等 2s（守住调用点）。"""
 
-    @staticmethod
-    def _frame(frame_id, exact_hash):
-        from src.recommendation_models import FrameEvidence
-        return FrameEvidence(
-            frame_id=frame_id, captured_at=0.0, desktop_size=(1920, 1080),
-            dpi=96, window_handle=1, foreground=True,
-            recommendation_roi=(7, 32, 278, 970), exact_hash=exact_hash,
-            perceptual_hash="0" * 64, panel_visible=True)
-
     def _step(self, entries_after):
         from manual_controller import ActionExecutionResult
         from src.game_state.recommendation_adapter import adapt_action
-        from src.parser.recommendation_parser import RecommendationParser
-        from src.recommendation_models import OcrEvidence
+        from src.recommendation.mapper import payload_to_action
         from src.safety.recommendation_validator import RecommendationValidator
-
-        def evidence(frame_id, text):
-            return OcrEvidence(
-                frame_id=frame_id, created_at=0.0, lines=(),
-                normalized_text=text, confidence=0.90, backend="test",
-                preprocessing="test")
-
-        class Capture:
-            def __init__(self):
-                self.frames = iter((self._frame("stable", "before"),
-                                    self._frame("current", "before"),
-                                    self._frame("after", "after")))
-
-            @staticmethod
-            def _frame(frame_id, exact_hash):
-                return FlowIntegrationTests._frame(frame_id, exact_hash)
-
-            def capture(self, ocr_panel_ok=False):
-                return next(self.frames)
-
-            @staticmethod
-            def crop_recommendation(current_frame):
-                return current_frame
-
-        class Reader:
-            def __init__(self):
-                self.read_count = 0
-
-            def read(self, frame_supplier, _roi_supplier):
-                current = frame_supplier()
-                self.read_count += 1
-                if self.read_count == 1:
-                    return evidence(current.frame_id, "结束回合")
-                return evidence(current.frame_id, "等待对手操作")
-
-            @staticmethod
-            def read_frame(current, _roi_supplier):
-                return evidence(current.frame_id, "结束回合")
+        from tests.support.recommendation_stubs import FakeSource, payload
 
         clock = FakeClock()
         active = state(10)
         after = state(entries_after)
-        states = iter(((active, 10), (active, 10), (after, 11), (after, 11)))
+        states = iter(((active, 10), (active, 10), (after, 11)))
         events = []
 
         def sleep(seconds):
@@ -309,8 +262,8 @@ class FlowIntegrationTests(unittest.TestCase):
                 return ActionExecutionResult(True, "executed")
 
         flow = RecommendationFlow(
-            capture=Capture(), reader=Reader(),
-            parser=RecommendationParser(),
+            source=FakeSource(payload("end_turn"), bump_after=2),
+            mapper=payload_to_action,
             state_supplier=lambda: next(states),
             adapter=adapt_action, validator=RecommendationValidator(),
             controller=Controller(), sleep=sleep, clock=clock,

@@ -233,9 +233,9 @@ class WinRateReadTests(unittest.TestCase):
                 "PIL": SimpleNamespace(ImageGrab=fake_grab),
                 "PIL.ImageGrab": fake_grab,
             }),
-            patch.object(FSM_action, "mulligan_reader",
-                         SimpleNamespace(backend=SimpleNamespace(
-                             recognize=FakeBackend().recognize))),
+            patch.object(FSM_action, "ocr_backend",
+                         SimpleNamespace(
+                             recognize=FakeBackend().recognize)),
         ):
             value = FSM_action.read_ai_win_rate()
 

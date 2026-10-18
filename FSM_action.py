@@ -19,15 +19,14 @@ from manual_controller import (
 from strategy import StrategyState
 import log_state as log_state_module
 from log_state import *
-from src.capture.desktop_capture import DesktopCapture
 from src.flow.mulligan_flow import MulliganFlow, MulliganStatus
 from src.flow.recommendation_flow import (
     FlowStepStatus, RecommendationFlow,
 )
 from src.game_state.recommendation_adapter import adapt_action
 from src.ocr.rapid_adapter import RapidOcrAdapter
-from src.ocr.stable_reader import StableRecommendationReader
-from src.parser.recommendation_parser import RecommendationParser
+from src.recommendation.cdp_source import CdpRecommendationSource
+from src.recommendation.mapper import payload_to_action
 from src.recommendation_config import RecommendationConfig
 from src.recommendation_models import ActionKind
 from src.safety.hearthstone_liveness import default_monitor
@@ -56,10 +55,10 @@ manual_controller = ManualController(
 auto_mulligan_flow = None
 recommendation_flow = None
 recommendation_config = None
-recommendation_capture = None
-recommendation_parser = None
-recommendation_reader = None
-mulligan_reader = None
+# 推荐来源：盒子 CEF 页面推送的 JSON（DevTools/CDP），不再截图/OCR。
+recommendation_source = None
+# OCR 引擎只为「结算段位」「左上角 AI 胜率」保留，与推荐链路无关。
+ocr_backend = None
 recommendation_validator = None
 active_game_generation = -1
 mulligan_delay_generation = None
@@ -126,53 +125,40 @@ def _automation_state_with_revision():
 
 
 def initialize_recommendation_automation():
-    """Rebuild per-game flows while reusing expensive OCR components.
+    """Rebuild per-game flows; recommendation comes from the box CEF push.
 
-    每次调用都会重新读取 ui_config.json 的 recommendation_roi（重建轻量的
-    RecommendationConfig + DesktopCapture），因此用校准工具画完框后，直接重开
-    对局/重启自动化即可生效，无需重启 web_ui。昂贵的 OCR 引擎（reader 与
-    RapidOCR backend）仍只创建一次、跨对局复用。
+    推荐链路已经不再截图/OCR：盒子（带 --remote-debugging-port）把
+    「打法参考A/B」以 JSON 推给 ladder-opp 页面，``CdpRecommendationSource``
+    直接读那份 JSON。开局/重开自动化只需重建轻量对象，CDP 连接跨局复用。
+
+    OCR 引擎只为「结算段位」「左上角 AI 胜率」保留（``ocr_backend``），
+    与推荐无关。
     """
     global auto_mulligan_flow, recommendation_flow
-    global recommendation_config, recommendation_capture
-    global recommendation_parser, recommendation_reader
-    global mulligan_reader, recommendation_validator
+    global recommendation_config, recommendation_source
+    global ocr_backend, recommendation_validator
 
-    # 轻量：每次都重建，以便拾取校准后的最新 ROI / 尺寸配置。
     recommendation_config = RecommendationConfig()
-    recommendation_capture = DesktopCapture(recommendation_config)
 
-    if recommendation_parser is None:
-        recommendation_parser = RecommendationParser()
+    if recommendation_source is None:
+        recommendation_source = CdpRecommendationSource()
 
-    if recommendation_reader is None:
-        recommendation_reader = StableRecommendationReader(
-            recommendation_config, RapidOcrAdapter(),
-            text_normalizer=recommendation_parser.normalize_action_text)
-        # 不设"打法参考A"信标：对战时该标题不在截图区域内（实测
-        # 面板直出「打出N号位…」指令文本），设信标会把正确指令清空为
-        # recommendation_not_stable 死循环。面板是否在场由 parser
-        # 严格句式（打出N号位随从/放置于我方N号位 等）唯一把关，
-        # 与换牌 reader 同一设计。
-    if mulligan_reader is None:
-        # 换牌面板只有留牌建议（无"打法参考A"标题）：不设信标，
-        # 面板是否在场由 `替换N号位卡牌` 换牌句式唯一把关。
-        # 独立 if 保证每次 initialize（含 config 已存在的后续对局）
-        # 都会为闭包绑定该变量。
-        mulligan_reader = StableRecommendationReader(
-            recommendation_config, recommendation_reader.backend,
-            text_normalizer=recommendation_parser.normalize_action_text)
+    if ocr_backend is None:
+        ocr_backend = RapidOcrAdapter()
+    if recommendation_validator is None:
         recommendation_validator = RecommendationValidator(
             recommendation_config)
 
     def read_mulligan_action():
-        # 换牌面板是否在场，由 OCR 证据裁定：识别出的文本必须能解析出
-        # `替换N号位卡牌` 换牌句式（无"打法参考A"信标的专用 reader）。
-        evidence = mulligan_reader.read(
-            lambda: recommendation_capture.capture(ocr_panel_ok=True),
-            recommendation_capture.crop_recommendation)
-        action = recommendation_parser.parse(
-            evidence, log_state.game_num_turns_in_play, log_state.revision)
+        # 换牌建议同样来自盒子推送（actionName == "replace"）。
+        snapshot = recommendation_source.snapshot()
+        if snapshot is None:
+            raise RuntimeError("recommendation_source_unavailable")
+        action = payload_to_action(
+            snapshot.payload,
+            turn_number=log_state.game_num_turns_in_play,
+            log_revision=log_state.revision,
+            frame_id="cdp-%d" % snapshot.version)
         if action.action != ActionKind.MULLIGAN:
             raise RuntimeError("recommendation_is_not_mulligan")
         return action
@@ -181,15 +167,13 @@ def initialize_recommendation_automation():
         click, read_mulligan_action, _automation_state,
         action_context=click.hearthstone_action_session,
         stopped=shutdown_event.is_set,
-        # 上游时序：OCR 前的每局等待由 ChoosingCardAction 的 ready 延时负责；
-        # OCR 成功后立即点击，不再叠加缓冲（mulligan_post_ocr_delay=0）。
+        # 上游时序：推荐是推送读到的，点击前只保留配置里的固定延时。
         first_delay=recommendation_config.mulligan_post_ocr_delay_seconds,
         retry_delay=recommendation_config.mulligan_post_ocr_delay_seconds,
         post_action_pause=_human_like_post_action_pause)
     recommendation_flow = RecommendationFlow(
-        capture=recommendation_capture,
-        reader=recommendation_reader,
-        parser=recommendation_parser,
+        source=recommendation_source,
+        mapper=payload_to_action,
         state_supplier=_automation_state_with_revision,
         adapter=adapt_action,
         validator=recommendation_validator,
@@ -1142,15 +1126,15 @@ def _grab_region_client_grabber():
 def _ocr_lines(box, scale: float, tag: str):
     """对屏幕区域做一次 OCR，返回 OcrLine 列表；不可用/异常返回 None。
 
-    复用换牌/胜率同一个 OCR backend（mulligan_reader 跨局复用），所以结算
-    阶段不会额外加载引擎；引擎没就绪时返回 None，由调用方回退。
+    这里只服务「结算段位」读取；推荐链路已经不碰 OCR 了。
+    引擎跨局复用（``ocr_backend``），引擎没就绪时返回 None，由调用方回退。
     """
-    reader = mulligan_reader
+    reader = ocr_backend
     img = _grab_region(box, scale)
     if img is None or reader is None:
         return None
     try:
-        evidence = reader.backend.recognize(
+        evidence = reader.recognize(
             img, f"{tag}-{time.time():.3f}", tag)
     except Exception:
         return None
@@ -1523,7 +1507,7 @@ def confirm_button_present() -> bool:
         rgb = np.asarray(ImageGrab.grab(
             bbox=tuple(int(v) for v in screen_box), all_screens=False))
         img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        evidence = mulligan_reader.backend.recognize(
+        evidence = ocr_backend.recognize(
             img, f"confirm-{time.time():.3f}", "confirm")
     except Exception:
         return False
@@ -1620,7 +1604,7 @@ def read_ai_win_rate():
         if img is None:
             continue
         try:
-            evidence = mulligan_reader.backend.recognize(
+            evidence = ocr_backend.recognize(
                 img, f"winrate-{index}-{time.time():.3f}", "winrate")
         except Exception:
             continue

@@ -7,7 +7,7 @@ from src.game_state.recommendation_adapter import (
     RecommendationStateError,
     adapt_action,
 )
-from src.parser.recommendation_parser import RecommendationParser
+from tests.support.recommendation_parser import RecommendationParser
 
 
 class RecordingClickModule:

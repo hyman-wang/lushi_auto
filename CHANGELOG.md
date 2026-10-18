@@ -6,6 +6,7 @@
 
 | 日期 | 提交 | 一句话 |
 | --- | --- | --- |
+| 2026-10-18 | 本次（`feat/cdp-recommendation`） | **AI 胜率也改读盒子推送**；去掉换牌「确认」按钮检测；OCR 只剩结算段位一处 |
 | 2026-10-18 | 本次（`feat/cdp-recommendation`） | **推荐改读盒子 JSON**：不再截图/OCR；盒子必须带 `--remote-debugging-port=9222` 启动（见 README 第 4 步） |
 | 2026-10-18 | 本次（`feat/rapidocr-ppocrv6`） | **OCR 换引擎**：RapidOCR + PP-OCRv6 small（ONNX Runtime），去掉 PaddlePaddle/PaddleOCR；更新后跑一次 `pip install -r requirements.txt` |
 | 2026-10-11 | 本次 | 新增**中断重启**：开关打开后 `Power.log` 停滞 5 分钟就自动重启炉石并重新进入对战，无人值守自己爬回来 |

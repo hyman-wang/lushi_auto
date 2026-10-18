@@ -94,23 +94,51 @@ HSArriver-Turbo  src/recommendation/cdp_source.py → mapper.py → 适配/点�
 | `timeline_undo` / `timeline_keep` | 回溯 / 维持 | `TIMELINE_UNDO` / `TIMELINE_KEEP` |
 | `titan_power` / `common_action` / `discard` / `choose` | — | 暂不支持（跳过，等盒子推下一条） |
 
-## 4. 代码位置
+## 4. AI 胜率（自动投降）
+
+同一个 CEF 应用里还有一个「AI 预测胜率」浮条页：
+
+```
+https://hs-web-embed.lushi.163.com/client-jipaiqi/winrate-predict
+```
+
+原生把数据推给 `window.onUpdateWinrateData("<json>")`，payload：
+
+```json
+{
+  "myWinRate": 42.5,
+  "myPlayer": {"name": "...", "job": "..."},
+  "oppPlayer": {"name": "...", "job": "..."},
+  "turns": [{"rate": 55.0, "x": 1, "y": 2}]
+}
+```
+
+`CdpWinrateSource.win_rate()` 直接返回 `myWinRate`，`read_ai_win_rate()` 用它，
+不再截图/OCR。页面只在浮条打开时创建，source 会自动重扫 target 切过去。
+
+## 5. 结算段位：盒子拿不到
+
+查过所有 CEF 页面的全局函数与 RPC 方法：
+
+- 没有 `onUpdateRankData` / 段位推送；
+- `client-home` 的「排名」来自盒子服务端（`latest_score`），要登录参数、且是上传后的统计值，
+  不是结算瞬间的名次；
+- 所以**结算段位仍然保留 OCR**（`FSM_action.read_rank_region`），这是目前唯一的 OCR 用途。
+
+## 6. 代码位置
 
 | 文件 | 作用 |
 |---|---|
-| `src/recommendation/cdp_source.py` | 找 `ladder-opp` 页面、挂 hook、轮询 `window.__boxRec`；断线重连 |
+| `src/recommendation/cdp_source.py` | 推荐 source（`ladder-opp`）+ AI 胜率 source（`winrate-predict`）；找页面、挂 hook、轮询、断线重连 |
 | `src/recommendation/mapper.py` | JSON → `ProposedAction`（号位/目标/落位/文案） |
 | `src/flow/recommendation_flow.py` | 用推送版本号判断「新推荐/没变」，替代原来的截图哈希 |
 | `src/safety/recommendation_validator.py` | 去掉帧/DPI/OCR 校验，保留回合、日志版本、去重 |
-| `FSM_action.py` | 初始化 source；换牌建议也走 `payload_to_action` |
+| `FSM_action.py` | 初始化两个 source；换牌建议走 `payload_to_action`；胜率走 `CdpWinrateSource` |
 
-OCR 仍保留给**非推荐**的三处读取（这些不是推荐数据，别删）：
+OCR 现在只剩**一处**：结算界面段位数字（上分停止/控分）。
+换牌「确认」按钮检测已经删除（提交后等状态机 `turn > 0` 进入对局，15s 超时兜底）。
 
-- 结算界面段位数字（上分停止/控分）
-- 左上角「AI胜率 X%」（自动投降）
-- 换牌「确认」按钮是否还在（防盲点）
-
-## 5. 排障
+## 7. 排障
 
 | 现象 | 处理 |
 |---|---|

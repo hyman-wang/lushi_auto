@@ -1,17 +1,17 @@
-"""CEF DevTools (CDP) 数据源：直接读盒子推给「打法参考A/B」面板的 JSON。
+"""CEF DevTools (CDP) 数据源：推荐 JSON + AI 胜率 JSON。
 
 背景（2026-10 实测）：
-  盒子把对局面板做成了 CEF 页面
-  ``https://hs-web-embed.lushi.163.com/client-jipaiqi/ladder-opp``，
-  原生层每算完一次推荐就调用页面里的
-  ``window.onUpdateLadderActionRecommend("<json>")``。
+  盒子把对局面板做成 CEF 页面：
+    * 推荐：``https://hs-web-embed.lushi.163.com/client-jipaiqi/ladder-opp``
+      原生调用 ``window.onUpdateLadderActionRecommend("<json>")``。
+    * AI 胜率：``.../client-jipaiqi/winrate-predict``
+      原生调用 ``window.onUpdateWinrateData("<json>")``，
+      payload = ``{myWinRate, myPlayer, oppPlayer, turns[]}``。
 
-  所以只要盒子带 ``--remote-debugging-port=9222`` 启动，本模块就能：
-    1. 通过 /json/list 找到 ladder-opp 页面；
-    2. 用 CDP ``Runtime.evaluate`` 把那个函数包一层，记下最后一次 payload；
-    3. 轮询 ``window.__boxRec``，把结构化推荐交给上层。
+  两个页面都是按需创建的（先进对局/先开胜率浮条），所以 source 会每 2 秒重扫
+  ``/json/list``，发现目标页面出现就切过去；页面刷新丢 hook 会自动补挂。
 
-  纯标准库实现（socket + urllib），不引入 websocket 依赖。
+纯标准库实现（socket + urllib），不引入 websocket 依赖。
 """
 
 from __future__ import annotations
@@ -28,56 +28,6 @@ from typing import Any, Optional
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9222
-
-# 页面优先级：游戏内真正出推荐的是 ladder-opp；ladder 只在盒子自己的窗口里用。
-TARGET_HINTS = ("ladder-opp", "client-jipaiqi", "hs-web-embed")
-
-# 在页面里把推荐入口包一层。用 defineProperty 的 setter 兜住“页面晚于我们挂载”
-# 的情况：React 挂载时给 window.onUpdateLadderActionRecommend 赋值会被我们拦下。
-HOOK_JS = r"""
-(() => {
-  if (window.__boxHooked) {
-    return 'already:' + ((window.__boxRec && window.__boxRec.ts) || 0);
-  }
-  window.__boxHooked = true;
-  window.__boxRec = { ts: 0, raw: null, parsed: null, err: null };
-  const norm = (s) => String(s)
-      .replaceAll('opp-target-hero', 'oppTargetHero')
-      .replaceAll('opp-target', 'oppTarget')
-      .replaceAll('target-hero', 'targetHero');
-  const wrap = (fn) => function (s) {
-    try {
-      window.__boxRec.ts = Date.now();
-      window.__boxRec.raw = s;
-      window.__boxRec.parsed = JSON.parse(norm(s));
-    } catch (e) {
-      window.__boxRec.err = String(e);
-    }
-    return fn.apply(this, arguments);
-  };
-  let cur = window.onUpdateLadderActionRecommend;
-  if (typeof cur === 'function') cur = wrap(cur);
-  try {
-    Object.defineProperty(window, 'onUpdateLadderActionRecommend', {
-      configurable: true,
-      get() { return cur; },
-      set(fn) { cur = (typeof fn === 'function') ? wrap(fn) : fn; },
-    });
-  } catch (e) {
-    window.__boxRec.err = 'defineProperty failed: ' + e;
-    window.onUpdateLadderActionRecommend = wrap(function () {});
-  }
-  return 'ok';
-})()
-"""
-
-_READ_JS = (
-    "JSON.stringify({"
-    "h: !!window.__boxHooked,"
-    "v: (window.__boxRec && window.__boxRec.ts) || 0,"
-    "p: (window.__boxRec && window.__boxRec.parsed) || null"
-    "})"
-)
 
 
 class CdpError(RuntimeError):
@@ -105,6 +55,9 @@ class RecommendationSnapshot:
         return list(data) if isinstance(data, list) else []
 
 
+# ---------------------------------------------------------------------------
+# 极简 WebSocket / CDP
+# ---------------------------------------------------------------------------
 class _WebSocket:
     """极简 RFC6455 客户端（只够 CDP 用：文本帧 + 掩码 + ping/pong）。"""
 
@@ -143,7 +96,6 @@ class _WebSocket:
         self._fragment = b""
         self._fragment_opcode = None
 
-    # -- send -----------------------------------------------------------
     def send_text(self, text: str) -> None:
         self._send_frame(0x1, text.encode("utf-8"))
 
@@ -163,7 +115,6 @@ class _WebSocket:
         masked = bytes(byte ^ mask[i % 4] for i, byte in enumerate(payload))
         self.sock.sendall(bytes(header) + masked)
 
-    # -- receive --------------------------------------------------------
     def _recv_exact(self, count: int) -> bytes:
         out = b""
         while len(out) < count:
@@ -265,8 +216,13 @@ class _Cdp:
         self.ws.close()
 
 
-class CdpRecommendationSource:
-    """从盒子 CEF 页面读取推荐快照；断线自动重连。"""
+# ---------------------------------------------------------------------------
+# 页面 source 基类：找 target、挂 hook、轮询、断线重连、自动换页
+# ---------------------------------------------------------------------------
+class _CdpPageSource:
+    TARGET_HINTS: tuple = ()
+    HOOK_JS: str = ""
+    READ_JS: str = ""
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
                  timeout: float = 2.0, retry_interval: float = 1.0,
@@ -275,8 +231,8 @@ class CdpRecommendationSource:
         self.port = port
         self.timeout = timeout
         self.retry_interval = retry_interval
-        # 空闲时可能先连到 analysis/client-home；进对局后 ladder-opp 才出现，
-        # 所以每隔几秒重扫一次 target，发现更好的页面就切过去。
+        # 页面是按需创建的（进对局才有 ladder-opp / 开胜率条才有 winrate-predict），
+        # 所以每隔几秒重扫 target，发现目标页面就切过去。
         self.target_check_interval = target_check_interval
         self.last_error: Optional[str] = None
         self._cdp: Optional[_Cdp] = None
@@ -286,7 +242,8 @@ class CdpRecommendationSource:
         self._last_target_check = 0.0
 
     # -- public ---------------------------------------------------------
-    def snapshot(self) -> Optional[RecommendationSnapshot]:
+    def read(self) -> Optional[dict]:
+        """读一次页面数据；没有数据/连不上返回 None。"""
         if time.time() < self._next_retry_at:
             return None
         for attempt in range(2):
@@ -294,20 +251,15 @@ class CdpRecommendationSource:
                 self._refresh_target()
                 if self._cdp is None:
                     self._connect()
-                raw = self._cdp.evaluate(_READ_JS, timeout=self.timeout)
+                raw = self._cdp.evaluate(self.READ_JS, timeout=self.timeout)
                 data = json.loads(raw) if raw else {}
                 if not data.get("h"):
                     # 页面导航/刷新后 hook 丢了，补挂一次。
-                    self._cdp.evaluate(HOOK_JS, timeout=self.timeout)
-                    raw = self._cdp.evaluate(_READ_JS, timeout=self.timeout)
+                    self._cdp.evaluate(self.HOOK_JS, timeout=self.timeout)
+                    raw = self._cdp.evaluate(self.READ_JS, timeout=self.timeout)
                     data = json.loads(raw) if raw else {}
-                version = int(data.get("v") or 0)
-                payload = data.get("p")
-                if version <= 0 or not isinstance(payload, dict):
-                    return None
                 self.last_error = None
-                return RecommendationSnapshot(
-                    version=version, payload=payload, received_at=time.time())
+                return data
             except Exception as exc:  # 断线/页面跳转：重连一次
                 self.last_error = f"{type(exc).__name__}: {exc}"
                 self._reset()
@@ -335,7 +287,7 @@ class CdpRecommendationSource:
         self._ws_url = None
 
     def _refresh_target(self) -> None:
-        """空闲时连的可能是 analysis；进对局后出现 ladder-opp 就切过去。"""
+        """空闲时连的可能是别的页面；目标页面出现后切过去。"""
         now = time.time()
         if now - self._last_target_check < self.target_check_interval:
             return
@@ -358,7 +310,7 @@ class CdpRecommendationSource:
         pages = [t for t in targets
                  if t.get("webSocketDebuggerUrl")
                  and (t.get("url") or "").startswith("http")]
-        for hint in TARGET_HINTS:
+        for hint in self.TARGET_HINTS:
             matched = [t for t in pages if hint in (t.get("url") or "")]
             if matched:
                 return matched[0]
@@ -371,10 +323,142 @@ class CdpRecommendationSource:
         cdp = _Cdp(target["webSocketDebuggerUrl"], timeout=self.timeout)
         try:
             cdp.call("Runtime.enable", timeout=self.timeout)
-            cdp.evaluate(HOOK_JS, timeout=self.timeout)
+            cdp.evaluate(self.HOOK_JS, timeout=self.timeout)
         except Exception:
             cdp.close()
             raise
         self._cdp = cdp
         self._target_url = target.get("url")
         self._ws_url = target["webSocketDebuggerUrl"]
+
+
+# ---------------------------------------------------------------------------
+# 推荐
+# ---------------------------------------------------------------------------
+_RECOMMEND_HOOK = r"""
+(() => {
+  if (window.__boxHooked) {
+    return 'already:' + ((window.__boxRec && window.__boxRec.ts) || 0);
+  }
+  window.__boxHooked = true;
+  window.__boxRec = { ts: 0, raw: null, parsed: null, err: null };
+  const norm = (s) => String(s)
+      .replaceAll('opp-target-hero', 'oppTargetHero')
+      .replaceAll('opp-target', 'oppTarget')
+      .replaceAll('target-hero', 'targetHero');
+  const wrap = (fn) => function (s) {
+    try {
+      window.__boxRec.ts = Date.now();
+      window.__boxRec.raw = s;
+      window.__boxRec.parsed = JSON.parse(norm(s));
+    } catch (e) {
+      window.__boxRec.err = String(e);
+    }
+    return fn.apply(this, arguments);
+  };
+  let cur = window.onUpdateLadderActionRecommend;
+  if (typeof cur === 'function') cur = wrap(cur);
+  try {
+    Object.defineProperty(window, 'onUpdateLadderActionRecommend', {
+      configurable: true,
+      get() { return cur; },
+      set(fn) { cur = (typeof fn === 'function') ? wrap(fn) : fn; },
+    });
+  } catch (e) {
+    window.__boxRec.err = 'defineProperty failed: ' + e;
+    window.onUpdateLadderActionRecommend = wrap(function () {});
+  }
+  return 'ok';
+})()
+"""
+
+_RECOMMEND_READ = (
+    "JSON.stringify({"
+    "h: !!window.__boxHooked,"
+    "v: (window.__boxRec && window.__boxRec.ts) || 0,"
+    "p: (window.__boxRec && window.__boxRec.parsed) || null"
+    "})"
+)
+
+
+class CdpRecommendationSource(_CdpPageSource):
+    """从盒子 CEF 页面读取推荐快照；断线自动重连。"""
+
+    TARGET_HINTS = ("ladder-opp", "client-jipaiqi", "hs-web-embed")
+    HOOK_JS = _RECOMMEND_HOOK
+    READ_JS = _RECOMMEND_READ
+
+    def snapshot(self) -> Optional[RecommendationSnapshot]:
+        data = self.read()
+        if not data:
+            return None
+        try:
+            version = int(data.get("v") or 0)
+        except (TypeError, ValueError):
+            return None
+        payload = data.get("p")
+        if version <= 0 or not isinstance(payload, dict):
+            return None
+        return RecommendationSnapshot(
+            version=version, payload=payload, received_at=time.time())
+
+
+# ---------------------------------------------------------------------------
+# AI 胜率
+# ---------------------------------------------------------------------------
+_WINRATE_HOOK = r"""
+(() => {
+  if (window.__boxWinrateHooked) return 'already';
+  window.__boxWinrateHooked = true;
+  const wrap = (fn) => function (s) {
+    try { window.__boxWinrate = JSON.parse(s); } catch (e) { window.__boxWinrate = null; }
+    return fn.apply(this, arguments);
+  };
+  let cur = window.onUpdateWinrateData;
+  if (typeof cur === 'function') cur = wrap(cur);
+  try {
+    Object.defineProperty(window, 'onUpdateWinrateData', {
+      configurable: true,
+      get() { return cur; },
+      set(fn) { cur = (typeof fn === 'function') ? wrap(fn) : fn; },
+    });
+  } catch (e) {
+    window.onUpdateWinrateData = wrap(function () {});
+  }
+  return 'ok';
+})()
+"""
+
+_WINRATE_READ = (
+    "JSON.stringify({"
+    "h: !!window.__boxWinrateHooked,"
+    "d: window.__boxWinrate || null"
+    "})"
+)
+
+
+class CdpWinrateSource(_CdpPageSource):
+    """读盒子「AI 预测胜率」浮条的 JSON（winrate-predict 页面）。"""
+
+    TARGET_HINTS = ("winrate-predict", "client-jipaiqi")
+    HOOK_JS = _WINRATE_HOOK
+    READ_JS = _WINRATE_READ
+
+    def latest(self) -> Optional[dict]:
+        data = self.read()
+        payload = (data or {}).get("d")
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("myWinRate") is None:
+            return None
+        return payload
+
+    def win_rate(self) -> Optional[float]:
+        payload = self.latest()
+        if payload is None:
+            return None
+        try:
+            value = float(payload["myWinRate"])
+        except (TypeError, ValueError):
+            return None
+        return value if 0.0 <= value <= 100.0 else None

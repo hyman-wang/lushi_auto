@@ -63,15 +63,6 @@ class RegionRegistryTests(unittest.TestCase):
         box = next(r["box"] for r in regions if r["key"] == "recommendation")
         self.assertEqual((7, 200, 202, 500), box)
 
-    def test_win_rate_regions_match_the_automation(self):
-        """预览画的框必须和自动投降实际截的区域一模一样。"""
-        import FSM_action
-
-        self.assertEqual(FSM_action._AI_WIN_RATE_REGIONS[0],
-                         screen_regions.AI_WIN_RATE_REGION)
-        self.assertEqual(FSM_action._AI_WIN_RATE_REGIONS[1],
-                         screen_regions.AI_WIN_RATE_WIDE_REGION)
-
     def test_post_game_regions_match_the_automation(self):
         """每局结束用的「开始」按钮 / 段位框必须和 FSM_action 读的区域一致。"""
         import FSM_action
@@ -221,23 +212,6 @@ class CalibrationTargetTests(unittest.TestCase):
                                               "win_rate")["config_key"])
         self.assertIsNone(
             screen_regions.calibration_target(make_config(), "nope"))
-
-    def test_automation_reads_the_calibrated_win_rate_region(self):
-        """自动投降实际截的区域也要跟着校准值走。"""
-        import FSM_action
-
-        saved = FSM_action.recommendation_config
-        try:
-            FSM_action.recommendation_config = SimpleNamespace(
-                ai_win_rate_roi=(120, 12, 280, 52),
-                ai_win_rate_wide_roi=(105, 0, 310, 64))
-            self.assertEqual(((120, 12, 280, 52), (105, 0, 310, 64)),
-                             FSM_action._ai_win_rate_regions())
-            FSM_action.recommendation_config = None
-            self.assertEqual(FSM_action._AI_WIN_RATE_REGIONS,
-                             FSM_action._ai_win_rate_regions())
-        finally:
-            FSM_action.recommendation_config = saved
 
     def test_state_probe_points_are_copies(self):
         points = screen_regions.state_probe_points()

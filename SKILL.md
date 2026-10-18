@@ -376,7 +376,7 @@ python hsctl.py --json screenshot --kind client --max-width 1280
 ```
 
 - `--kind client`（默认）= 炉石客户区，**含叠在上面的盒子面板** —— 这就是脚本操作的画面；
-- `--kind roi` = 盒子推荐面板，即 **OCR 的输入**：识别失败时对比日志里的 OCR 原文最直接；
+- `--kind roi` = 盒子推荐面板截图（**已废弃**：推荐改读盒子推送的 JSON，不再 OCR；保留只为看画面）；
 - `--kind full` = 整屏，用来看盒子/浮窗有没有被别的窗口挡住；
 - `--kind boxes` = 带校准区域框，用来判断校准是否还对齐。
 

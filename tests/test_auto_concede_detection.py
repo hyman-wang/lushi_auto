@@ -194,53 +194,25 @@ class ConcedeDetectionStateTests(unittest.TestCase):
 
 
 class WinRateReadTests(unittest.TestCase):
-    """OCR 读取：小字号放大 + 主区域读不到时用兜底区域。"""
+    """AI 胜率来自 winrate-predict 页面的推送，不再 OCR。"""
 
-    def test_returns_none_when_dependencies_missing(self):
-        with patch.dict("sys.modules", {"cv2": None}):
+    def test_reads_from_the_cdp_winrate_source(self):
+        source = SimpleNamespace(win_rate=lambda: 42.5)
+
+        with patch.object(FSM_action, "winrate_source", source):
+            self.assertEqual(42.5, FSM_action.read_ai_win_rate())
+
+    def test_returns_none_without_a_source(self):
+        with patch.object(FSM_action, "winrate_source", None):
             self.assertIsNone(FSM_action.read_ai_win_rate())
 
-    def test_uses_the_fallback_region(self):
-        attempts = []
+    def test_source_failure_returns_none(self):
+        def boom():
+            raise RuntimeError("cdp down")
 
-        class FakeBackend:
-            def recognize(self, img, tag, kind):
-                attempts.append(tag)
-                if tag.startswith("winrate-0"):
-                    return SimpleNamespace(lines=())
-                return SimpleNamespace(lines=(SimpleNamespace(
-                    text="AI胜率 15%", confidence=0.9),))
-
-        class FakeCv2:
-            COLOR_RGB2BGR = 0
-            INTER_CUBIC = 2
-
-            @staticmethod
-            def cvtColor(img, code):
-                return img
-
-            @staticmethod
-            def resize(img, size, fx=None, fy=None, interpolation=None):
-                return img
-
-        fake_np = SimpleNamespace(asarray=lambda img: img)
-        fake_grab = SimpleNamespace(grab=lambda bbox, all_screens: "img")
-
-        with (
-            patch.dict("sys.modules", {
-                "cv2": FakeCv2,
-                "numpy": fake_np,
-                "PIL": SimpleNamespace(ImageGrab=fake_grab),
-                "PIL.ImageGrab": fake_grab,
-            }),
-            patch.object(FSM_action, "ocr_backend",
-                         SimpleNamespace(
-                             recognize=FakeBackend().recognize)),
-        ):
-            value = FSM_action.read_ai_win_rate()
-
-        self.assertEqual(15.0, value)
-        self.assertEqual(2, len(attempts))       # 主区域失败后用了兜底区域
+        with patch.object(FSM_action, "winrate_source",
+                          SimpleNamespace(win_rate=boom)):
+            self.assertIsNone(FSM_action.read_ai_win_rate())
 
 
 if __name__ == "__main__":

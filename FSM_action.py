@@ -25,7 +25,9 @@ from src.flow.recommendation_flow import (
 )
 from src.game_state.recommendation_adapter import adapt_action
 from src.ocr.rapid_adapter import RapidOcrAdapter
-from src.recommendation.cdp_source import CdpRecommendationSource
+from src.recommendation.cdp_source import (
+    CdpRecommendationSource, CdpWinrateSource,
+)
 from src.recommendation.mapper import payload_to_action
 from src.recommendation_config import RecommendationConfig
 from src.recommendation_models import ActionKind
@@ -57,7 +59,9 @@ recommendation_flow = None
 recommendation_config = None
 # 推荐来源：盒子 CEF 页面推送的 JSON（DevTools/CDP），不再截图/OCR。
 recommendation_source = None
-# OCR 引擎只为「结算段位」「左上角 AI 胜率」保留，与推荐链路无关。
+# AI 胜率来源：winrate-predict 页面的推送（同样是 CEF JSON）。
+winrate_source = None
+# OCR 引擎只为「结算段位」保留（上分停止/控分）。
 ocr_backend = None
 recommendation_validator = None
 active_game_generation = -1
@@ -131,17 +135,18 @@ def initialize_recommendation_automation():
     「打法参考A/B」以 JSON 推给 ladder-opp 页面，``CdpRecommendationSource``
     直接读那份 JSON。开局/重开自动化只需重建轻量对象，CDP 连接跨局复用。
 
-    OCR 引擎只为「结算段位」「左上角 AI 胜率」保留（``ocr_backend``），
-    与推荐无关。
+    OCR 引擎只为「结算段位」保留（``ocr_backend``），推荐与 AI 胜率都走 CEF 推送。
     """
     global auto_mulligan_flow, recommendation_flow
-    global recommendation_config, recommendation_source
+    global recommendation_config, recommendation_source, winrate_source
     global ocr_backend, recommendation_validator
 
     recommendation_config = RecommendationConfig()
 
     if recommendation_source is None:
         recommendation_source = CdpRecommendationSource()
+    if winrate_source is None:
+        winrate_source = CdpWinrateSource()
 
     if ocr_backend is None:
         ocr_backend = RapidOcrAdapter()
@@ -638,14 +643,13 @@ def ChoosingCardAction():
 
     if auto_mulligan_flow is not None:
         auto_mulligan_flow.reset_delay()  # 每局首次用 ready(7)，重试用 post_ocr(5)
-        # 换牌自动流（理想流程）：
-        #   每局 ready(20s) 等待后进入循环 → 每隔 mulligan_retry(5s) 一次：
-        #     ① 先检测屏幕中间“确认”按钮是否在场（面板就绪的物理信号）
-        #     ② 在    → OCR 左侧留牌建议并执行换牌（替换+确认）
-        #        不在 → 等 mulligan_retry_delay 再试
-        #   点击后转为“确认按钮是否消失”校验：消失=已提交，仍在=未提交重试。
+        # 换牌自动流：
+        #   ready 延时后进入循环，每隔 mulligan_retry(5s) 读一次盒子推送的
+        #   `replace` 建议并执行（替换+确认）。提交后等状态机进入对局
+        #   （turn>0 直接返回 BATTLING）；不再检测“确认”按钮。
         confirmed_waiting = False
         verified = False
+        confirmed_at = 0.0
         # 重试间隔（面板未就绪/推荐暂不可执行/确认未消失时每轮等待）。
         # 不复用 post_ocr（那是“识别→点击”缓冲）：上游 post_ocr=0 时，
         # 若重试也取 0 会变成 0 秒忙等（CPU 空转 + 疯狂截图）。独立默认 5s。
@@ -667,31 +671,25 @@ def ChoosingCardAction():
             if confirmed_waiting:
                 if not verified:
                     verified = True
-                    # 点击确认后等界面切换，再检测“确认”按钮是否还在：
-                    # 还在 → 换牌未提交成功，重新执行；消失 → 已提交。
+                    confirmed_at = time.time()
+                    # 点击确认后等状态机进入对局（turn>0 会返回 BATTLING）。
                     time.sleep(0.5)
-                    if confirm_button_present():
-                        confirmed_waiting = False
-                        verified = False
-                        _report_mulligan_diagnostic(
-                            "confirm_still_there",
-                            "换牌确认仍在（未提交成功），重新执行……")
-                        continue
+                if time.time() - confirmed_at > 15:
+                    confirmed_waiting = False
+                    verified = False
+                    _report_mulligan_diagnostic(
+                        "confirm_timeout",
+                        "换牌确认后 15s 仍未进入对局，重新执行……")
+                    continue
                 time.sleep(0.3)
-                continue
-            # 每轮开头先检测“确认”按钮：在 → 执行换牌；不在 → 等 retry 再试。
-            if not confirm_button_present():
-                _report_mulligan_diagnostic(
-                    "confirm_absent",
-                    "确认按钮未检测到（面板尚未就绪或已提交），等待重试……")
-                _sleep_with_delay(retry_delay, "换牌重试")
                 continue
             result = auto_mulligan_flow.run()
             if result.status == MulliganStatus.CONFIRMED:
                 confirmed_waiting = True
                 verified = False
+                confirmed_at = time.time()
                 _report_mulligan_diagnostic(
-                    "confirmed", "已执行换牌，检测确认按钮……")
+                    "confirmed", "已执行换牌，等待对局开始……")
                 time.sleep(0.3)
                 continue
             message = f"换牌推荐暂不可执行，继续重试：{result.diagnostics}"
@@ -700,9 +698,7 @@ def ChoosingCardAction():
             if (diag == "recommendation_is_not_mulligan"
                     or diag.endswith(":recommendation_is_not_mulligan")
                     or diag == "mulligan_stage_changed"
-                    or diag == "hand_changed"
-                    or diag == "confirm_button_absent"
-                    or diag.endswith(":confirm_button_absent")):
+                    or diag == "hand_changed"):
                 message = ("换牌阶段未检测到可执行的留牌面板（可能已提交或"
                            "面板未就绪），等待对局开始……")
             _report_mulligan_diagnostic(result.diagnostics, message)
@@ -1488,69 +1484,12 @@ def click_post_game_point():
     click.commit_error_report()
 
 
-def confirm_button_present() -> bool:
-    """换牌“确认”按钮是否仍在屏幕中间（提交后应消失）。
-
-    用于换牌点击后的二次校验：确认按钮还在 → 换牌未提交成功，需重试；
-    确认按钮消失 → 已提交，等待对局开始。用 OCR 读按钮区域的“确认”二字。
-    """
-    try:
-        import cv2
-        import numpy as np
-        from PIL import ImageGrab
-    except Exception:
-        return False
-    try:
-        from display_mapping import box_to_screen, display_mapping
-        box = recommendation_config.mulligan_confirm_roi
-        screen_box = box_to_screen(box, display_mapping())
-        rgb = np.asarray(ImageGrab.grab(
-            bbox=tuple(int(v) for v in screen_box), all_screens=False))
-        img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        evidence = ocr_backend.recognize(
-            img, f"confirm-{time.time():.3f}", "confirm")
-    except Exception:
-        return False
-    return any(
-        "确认" in line.text and line.confidence >= 0.5
-        for line in evidence.lines)
-
-
 # ---------------------------------------------------------------- 自动投降检测
-# 盒子浮动条“AI胜率 X%”的截图区域（1920x1080 实测）：主区域 + 放宽的兜底区域。
-# 这是代码默认值；用户用校准工具改过之后走 ui_config.json 的
-# ai_win_rate_roi / ai_win_rate_wide_roi（见 _ai_win_rate_regions）。
-_AI_WIN_RATE_REGIONS = ((110, 8, 270, 48), (95, 0, 300, 60))
-# 浮动条字号很小，放大后再送 OCR，识别率明显更高。
-_AI_WIN_RATE_SCALE = 2.0
-# 同一回合内 OCR 读不到时的重试次数与间隔：盒子浮动条常常要等面板画好才出现，
-# 只读一次就丢掉整个回合会表现为“有时候根本没在检测”。
+# 盒子「AI 预测胜率」浮条的数据来自 CEF 页面推送（window.onUpdateWinrateData），
+# 不再截图 OCR。payload 形如 {myWinRate, myPlayer, oppPlayer, turns[]}。
+# 同一回合内读不到时的重试次数与间隔（浮条要等面板画好才出现）。
 _CONCEDE_MAX_ATTEMPTS = 3
 _CONCEDE_RETRY_WAIT = 0.6
-
-
-def _ai_win_rate_regions() -> tuple:
-    """AI胜率截图区域 (主区域, 兜底区域)：优先用用户校准值，否则用默认值。
-
-    recommendation_config 在 initialize_recommendation_automation() 里每次
-    对局都会重建，因此校准完重开对局即生效，不用重启脚本。
-    """
-    config = recommendation_config
-    if config is None:
-        return _AI_WIN_RATE_REGIONS
-    main = getattr(config, "ai_win_rate_roi", None)
-    wide = getattr(config, "ai_win_rate_wide_roi", None)
-    if main is None and wide is None:
-        return _AI_WIN_RATE_REGIONS
-    try:
-        regions = list(_AI_WIN_RATE_REGIONS)
-        if main is not None:
-            regions[0] = tuple(int(v) for v in main)
-        if wide is not None:
-            regions[1] = tuple(int(v) for v in wide)
-        return tuple(regions)
-    except (TypeError, ValueError):
-        return _AI_WIN_RATE_REGIONS
 
 
 def concede_detection_state() -> dict:
@@ -1591,30 +1530,17 @@ def _load_concede_config():
 
 
 def read_ai_win_rate():
-    """OCR 左上角盒子“AI胜率 X%”，返回百分数值；读不到返回 None。
+    """读盒子推送的 AI 胜率（百分数值）；读不到返回 None。
 
-    浮动条字号很小，先放大再识别；主区域读不到时用放宽的兜底区域再试一次，
-    避免因为浮动条位置/宽度略有差异而整回合读不到。
-
-    区域是客户区相对坐标，交给 _grab_region 统一换算到屏幕（含窗口偏移），
-    所以与 _grab_region 的放大补偿共用一套逻辑。
+    数据源：winrate-predict 页面里的 window.onUpdateWinrateData（见
+    src/recommendation/cdp_source.py 的 CdpWinrateSource），不再截图 OCR。
     """
-    for index, box in enumerate(_ai_win_rate_regions()):
-        img = _grab_region(box, _AI_WIN_RATE_SCALE)
-        if img is None:
-            continue
-        try:
-            evidence = ocr_backend.recognize(
-                img, f"winrate-{index}-{time.time():.3f}", "winrate")
-        except Exception:
-            continue
-        for line in evidence.lines:
-            m = re.search(r"(\d+(?:\.\d+)?)\s*%", line.text)
-            if m:
-                value = float(m.group(1))
-                if 0.0 <= value <= 100.0:
-                    return value
-    return None
+    if winrate_source is None:
+        return None
+    try:
+        return winrate_source.win_rate()
+    except Exception:
+        return None
 
 
 def _maybe_concede(snapshot):

@@ -98,7 +98,7 @@ python hsctl.py serve task-status
 #   任务不在 → python hsctl.py serve install-task          （非管理员会打印一条命令给用户）
 
 # ③ 修配置（只在需要时）
-python hsctl.py config set --name "Priscilla#51346" --log-root "D:\Battle.net\Hearthstone\Logs"
+python hsctl.py config set --name "Player#12345" --log-root "D:\Hearthstone\Logs"
 
 # ④ 准备（开浮窗 + 切炉石前台，不开打）
 python hsctl.py prepare

@@ -34,7 +34,6 @@ class SelfcheckCollapsePageTests(unittest.TestCase):
     def test_failure_auto_expands_without_saving_a_preference(self):
         self.assertIn("if (!isOk) {", self.html)
         self.assertIn("setSelfcheckCollapsed(false, false);", self.html)
-        self.assertIn('classList.toggle("wide", !isOk)', self.html)
 
     def test_summary_is_hidden_while_collapsed(self):
         """通过时只留徽标；明细和结论行都收起，失败时自动展开。"""

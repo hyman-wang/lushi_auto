@@ -139,7 +139,7 @@ def _default_config():
     """拿一份配置：优先自动化主循环**正在用的那一份**，没有才新建。
 
     只用 `sys.modules` 里已有的 `FSM_action`（不主动 import 它）——避免为了读一个
-    ROI 就把键盘钩子/OCR 那堆重模块拉起来；`get_state()` 这条热路径也就不用每次
+    ROI 就把键盘钩子那堆重模块拉起来；`get_state()` 这条热路径也就不用每次
     重新读盘。
     """
     module = sys.modules.get("FSM_action")

@@ -411,7 +411,7 @@ def push(line: str, _level: str = "INFO") -> None:
             while len(_LINES) > _MAX_LINES:
                 _LINES.popleft()
     if is_turn_start:
-        # 我方回合开始：把炉石唤回前台，避免 OCR 被其他窗口挡住。
+        # 我方回合开始：把炉石唤回前台，避免截图被其他窗口挡住。
         _raise_hearthstone()
 
 

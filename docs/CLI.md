@@ -119,7 +119,7 @@ JSON 模式下：
 ```powershell
 python hsctl.py screenshot                       # 默认：炉石客户区
 python hsctl.py screenshot --kind full           # 整屏（看盒子/浮窗摆位）
-python hsctl.py screenshot --kind roi            # 盒子推荐面板 = OCR 真正看到的那块
+python hsctl.py screenshot --kind roi            # 盒子推荐面板区域（仅预览；推荐已改读盒子 JSON）
 python hsctl.py screenshot --kind boxes          # 整屏 + 所有校准区域框
 python hsctl.py screenshot --points mode         # 客户区 + 「模式切换」四个点击点（红十字）
 python hsctl.py screenshot --max-width 1280      # 4K 屏建议缩一下再喂给模型
@@ -144,7 +144,7 @@ python hsctl.py --json screenshot                # 机器可读
 | --- | --- | --- |
 | `client`（默认） | 炉石**客户区** | 游戏界面 + 叠在上面的盒子面板 —— 排查"为什么没按推荐出牌"就看这个 |
 | `full` | 整屏 | 盒子/浮窗摆到哪里去了、有没有别的窗口挡住 |
-| `roi` | 盒子推荐面板 ROI | OCR 的**输入**长什么样，识别失败时对比原文 |
+| `roi` | 盒子推荐面板区域 | 仅预览（推荐已改读盒子 JSON，不再截图识别） |
 | `boxes` | 整屏 + 区域框 | 校准是否对齐（同网页「🎯 校准区域」那张图） |
 
 **`client`/`roi` 在截不到客户区时会退化为整屏，并在 `note`/`reason` 里说明原因**，
@@ -155,7 +155,7 @@ python hsctl.py --json screenshot                # 机器可读
   `get_HS_hwnd()` 仍会返回有效句柄，但客户区是 `0×0`、原点被 Windows 挪到 `(-32000,-32000)`。
 - 窗口被挪到屏幕外 → `炉石窗口被最小化到屏幕外（(...)）`
 
-全程只读：`ImageGrab` + 与 OCR 同一套客户区几何换算，不点击、不移动鼠标、不改游戏状态。
+全程只读：`ImageGrab` + 同一套客户区几何换算，不点击、不移动鼠标、不改游戏状态。
 截图在**控制台进程**里做，所以 CLI 是否提权都不影响。
 
 
@@ -266,7 +266,6 @@ python hsctl.py deck --clear   # 关掉（保持你手选的卡组）
 | `mulligan_post_ocr_delay_seconds` | 下次「开始对战」生效 |
 | `post_action_delay_seconds` | 下次「开始对战」生效 |
 | `draw_extra_delay_per_card_seconds` | 下次「开始对战」生效 |
-| `ocr_preprocess_scale` | **需重启脚本进程** |
 
 「立即生效」是**就地改写**正在运行的那个 `RecommendationConfig`（它是 frozen dataclass，
 所以实现上刻意用 `object.__setattr__` 绕过冻结）—— 这样所有共享同一实例的流程对象
@@ -420,8 +419,8 @@ python hsctl.py env --pin auto     # 自动选第一个合格候选
 ```
 
 - **校验**：必须 Python **3.12.x**（项目实测基线；3.13+ 未验证）且
-  `win32gui/cv2/numpy/PIL/rapidocr/onnxruntime/psutil/keyboard/pynput/requests`
-  全部齐全。校验只 `find_spec`（**不 import**），所以不会把 OCR 引擎拉起来。
+  `win32gui/cv2/numpy/PIL/psutil/keyboard/pynput/requests`
+  全部齐全。校验只 `find_spec`（**不 import**），所以不会拉起重依赖。
 - **解析顺序**：`HS_PYTHON` 环境变量 → `log/env.json` → 当前解释器（校验通过才用）
   → 候选探测（`CONDA_PREFIX` / `VIRTUAL_ENV` / 常见 conda 位置 / 仓库内 venv /
   `where python`）。

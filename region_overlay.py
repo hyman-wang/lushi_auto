@@ -3,7 +3,7 @@
 
 用途：对战中一眼确认盒子 UI 有没有摆正，并提示「请对齐相应UI」。
 屏幕上直接画出脚本实际使用的截图区域（颜色与网页预览一致）：
-    🟩 绿框 = 盒子推荐面板（OCR 识别来源，把「打法参考A」面板移进来）
+    🟩 绿框 = 盒子推荐面板（仅框位预览；推荐已改读盒子 JSON）
     🟦 蓝框 = 换牌「确认」按钮
     🟧 橙框 = 盒子「AI胜率」浮动条   🟥 红细框 = AI胜率兜底区域
     🩵 青绿框 = 结算「开始」按钮      🟪 紫框 = 段位数字（名次）
@@ -263,7 +263,7 @@ USER32.SetWindowLongW.restype = ctypes.c_long
 
 # ---------------------------------------------------------------- 提示条
 HINT_TITLE = "请对齐相应UI"
-HINT_DETAIL = "把盒子的「打法参考A」面板移进绿框；橙框=AI胜率浮动条、黄十字=阶段判定点"
+HINT_DETAIL = "绿框/橙框仅用于框位预览（推荐、胜率已改读盒子数据）；黄十字=阶段判定点"
 HINT_CLOSE = "按 Esc 或再点浮窗「校准」关闭"
 
 _CARD_BG = (18, 13, 8, 222)
@@ -299,7 +299,7 @@ def hint_lines(panel_state: Optional[bool] = None, mapping_text: str = "",
         lines.append({"text": "已检测到盒子面板",
                       "color": _OK_COLOR, "size": 15, "bold": True})
     elif panel_state is False:
-        lines.append({"text": "还没检测到盒子面板：请把「打法参考A」面板移进绿框",
+        lines.append({"text": "还没检测到盒子面板（该框仅预览，不参与推荐识别）",
                       "color": _WARN_COLOR, "size": 15, "bold": True})
     if status and status.get("text"):
         lines.append({"text": str(status["text"]),

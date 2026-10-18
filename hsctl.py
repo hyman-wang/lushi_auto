@@ -190,7 +190,7 @@ def verify_python(python: str, *,
         return {"ok": False, "executable": str(payload.get("executable") or python),
                 "version": version, "missing": missing,
                 "reason": f"版本 {'.'.join(str(v) for v in version)} 不是 "
-                          f"{EXPECTED_PYTHON[0]}.{EXPECTED_PYTHON[1]}（3.13+ 装不上 OCR 轮子）"}
+                          f"{EXPECTED_PYTHON[0]}.{EXPECTED_PYTHON[1]}（3.13+ 依赖轮子不全）"}
     if missing:
         return {"ok": False, "executable": str(payload.get("executable") or python),
                 "version": version, "missing": missing,
@@ -2523,7 +2523,7 @@ def build_parser() -> argparse.ArgumentParser:
                        help="按需抓一帧画面（只截图，不点击）")
     p.add_argument("--kind", choices=SCREENSHOT_KINDS, default="client",
                    help="client=炉石客户区(默认) / full=整屏 / "
-                        "roi=推荐面板(OCR 看到的) / boxes=整屏+区域框")
+                        "roi=推荐面板区域(仅预览) / boxes=整屏+区域框")
     p.add_argument("--max-width", type=int, default=0, metavar="像素",
                    help="超过这个宽度就等比缩小（0=不缩；给 agent 看建议 1280）")
     p.add_argument("--out", default=None, metavar="文件名",

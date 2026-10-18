@@ -17,7 +17,7 @@
 范围内，3.11 及以下与验证环境不一致，容易出玄学问题。所以这里把
 「3.12 + 64 位」作为唯一推荐值，其它版本一律 ❌ 并给出安装提示。
 
-本模块只依赖标准库，导入它本身不会拉起 numpy/OCR 之类的重依赖
+本模块只依赖标准库，导入它本身不会拉起 numpy 之类的重依赖
 （缺依赖时更要能跑起来报错，否则自检就成了「没装依赖就跑不了自检」）。
 """
 from __future__ import annotations
@@ -46,7 +46,7 @@ EXPECTED_PYTHON = (3, 12)
 PYTHON_HINT = (
     "请装 Python 3.12（64 位）：conda create -n HTL python=3.12 -y && "
     "conda activate HTL，再执行 pip install -r requirements.txt。"
-    "不要用 3.11 及以下，也不要用 3.13 及以上（OCR 依赖没有对应轮子）。")
+    "不要用 3.11 及以下，也不要用 3.13 及以上（依赖没有对应轮子）。")
 
 # ---------------------------------------------------------------- 依赖清单
 # 每项：imports=代码里真正 import 的名字；dist=PyPI 发行包名（可多个候选）；
@@ -384,7 +384,7 @@ def _client_mapping_items(config) -> list[dict]:
         if hwnd and not is_allowed_hearthstone_foreground(hwnd):
             items.append(_item(
                 "foreground", "炉石窗口在前台", STATUS_WARN, "被其它窗口遮挡",
-                "坐标换算与遮挡无关，仍会点对位置；但截图/OCR 会拍到遮挡窗口，"
+                "坐标换算与遮挡无关，仍会点对位置；但截图会拍到遮挡窗口，"
                 "运行时请把炉石留在最前面。", False, "截图区域是否拍到炉石画面"))
     except Exception:
         pass

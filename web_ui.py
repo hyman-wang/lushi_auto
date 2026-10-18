@@ -360,7 +360,7 @@ def capture_frame(kind: str = "client"):
     kind:
       * ``client`` —— 只抓炉石**客户区**（默认；"看游戏界面"就用这个）
       * ``full``   —— 整屏（含桌面其它窗口，用来看盒子/浮窗的摆位）
-      * ``roi``    —— 只抓盒子推荐面板 ROI（脚本 OCR 真正看到的那一小块）
+      * ``roi``    —— 只抓盒子推荐面板区域（仅预览；推荐已改读盒子 JSON）
       * ``boxes``  —— 整屏 + 所有校准区域框（与网页「校准区域」同一张图）
 
     读不到客户区（炉石没开/最小化/窗口不可用）时 ``client``/``roi`` 会退化成
@@ -422,7 +422,7 @@ def capture_frame(kind: str = "client"):
             return frame.convert("RGB"), info
         why = "客户区抓图返回空帧"
 
-    else:   # roi：与 OCR 同口径 —— box_to_screen(config.recommendation_roi, mapping)
+    else:   # roi：盒子面板区域（仅预览）
         roi = tuple(RecommendationConfig().recommendation_roi)
         frame, mapping = display_mapping.capture_region(
             region=roi, region_is_client=True, grabber=_pillow_region_grabber)
@@ -431,7 +431,7 @@ def capture_frame(kind: str = "client"):
                          "mapping": display_mapping.mapping_info(mapping),
                          "box": list(display_mapping.box_to_screen(
                              roi, mapping, clamp=False)),
-                         "note": "盒子推荐面板 ROI —— 脚本 OCR 真正看到的那一小块"})
+                         "note": "盒子推荐面板区域（仅预览；推荐已改读盒子 JSON）"})
             return frame.convert("RGB"), info
         why = "推荐面板 ROI 抓图返回空帧"
 
@@ -1286,7 +1286,7 @@ def api_save_delays(body):
     字段的实际生效时机：
         live       —— 立刻生效（内存实例已改写，或调用方每次重新读盘）
         next_start —— 下一次「开始对战」生效（启动时按值快照进流程对象）
-        restart    —— 需重启脚本进程（OCR 预处理在模块导入期取常量）
+        restart    —— 需重启脚本进程（启动期缓存的常量）
     """
     hot = _hot_requested(body)
     with CTRL.lock:

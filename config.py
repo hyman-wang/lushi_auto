@@ -628,15 +628,15 @@ def _code_default(key: str):
 
 
 def _user_roi() -> Optional[tuple[int, int, int, int]]:
-    """读取用户校准的推荐区域（ui_config.json 的 recommendation_roi，客户区相对）。"""
+    """读取用户校准的推荐面板区域（仅兼容/预览；推荐已改读盒子 JSON）。"""
     return _user_box("recommendation_roi", _code_default("recommendation_roi"))
 
 
 def _user_confirm_roi() -> Optional[tuple[int, int, int, int]]:
-    """读取用户校准的换牌"确认"按钮区域（ui_config.json 的 mulligan_confirm_roi）。
+    """读取用户校准的换牌「确认」按钮区域（仅兼容/预览；换牌不再检测它）。
 
     用于换牌阶段检测“确认”按钮是否在场：按钮在 → 可安全执行换牌并点击确认；
-    按钮不在 → 面板未就绪或已提交，不盲目点击。格式同 recommendation_roi。
+    格式同 recommendation_roi。
     """
     return _user_box("mulligan_confirm_roi",
                      _code_default("mulligan_confirm_roi"))
@@ -722,7 +722,7 @@ class RecommendationConfig:
     # 可通过 ui_config.json 的 mulligan_confirm_roi 覆盖。
     mulligan_confirm_roi: tuple[int, int, int, int] = (860, 810, 1060, 890)
 
-    # 盒子「AI胜率 X%」浮动条区域（开了自动投降时 OCR 读取）。
+    # 盒子「AI胜率 X%」浮动条区域（仅兼容/预览；胜率已改读盒子推送）。
     # 主区域读不到时用 ai_win_rate_wide_roi（= 主区域外扩一圈）再读一次兜底。
     # 两者都可通过 ui_config.json 同名键覆盖（校准工具写入）。
     ai_win_rate_roi: tuple[int, int, int, int] = (110, 8, 270, 48)
@@ -792,11 +792,6 @@ class RecommendationConfig:
     discover_target_delay_seconds: float = 0.3
     # 单次执行（点击操作）结果的等待/校验超时（秒）。
     result_timeout_seconds: float = 5.0
-
-    # 调试用：每次 OCR 的实际输入图按顺序存盘目录（空 = 关闭）。
-    # 若开启，会在该目录下生成 run_<HHMMSS>/001_*.png 系列，便于排查“识别
-    # 到了什么图”。优先被环境变量 OCR_FRAME_DIR 覆盖。
-    ocr_frame_dump_dir: str = ""
 
     def __post_init__(self) -> None:
         # 用户可覆盖项依次应用（代码默认 < ui_config.json）：

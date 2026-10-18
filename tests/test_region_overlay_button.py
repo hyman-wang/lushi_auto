@@ -140,7 +140,7 @@ class HintTests(unittest.TestCase):
 
         self.assertEqual(3, len(unknown))
         self.assertIn("已检测到盒子面板", visible)
-        self.assertTrue(any("移进绿框" in text for text in missing))
+        self.assertTrue(any("还没检测到盒子面板" in text for text in missing))
 
     def test_hint_text_has_no_emoji_glyphs(self):
         """PIL 用微软雅黑画字，emoji 会变成方框 —— 提示条里不许出现 emoji。"""

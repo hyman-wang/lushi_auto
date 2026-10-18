@@ -6,17 +6,17 @@
   * 日志浮窗右上角「校准」按钮
   * 源码运行：python calibrate_roi.py
   * 自检：python calibrate_roi.py --selftest —— 窗口打开约 1 秒自动退出
-  * 只拖框不跑 OCR：python calibrate_roi.py --no-ocr
+  * 只拖框不跑预览：python calibrate_roi.py --no-ocr（OCR 已移除，预览已停用）
 
 十二个可校准目标（按 Tab 切换，或直接点屏幕正中央的目标条）：
 
 | # | 目标 | 写入 ui_config.json | 对齐方法 |
 | --- | --- | --- | --- |
-| 1 | 盒子推荐面板（绿） | `recommendation_roi` | 把盒子的「打法参考A」面板框进绿框 |
-| 2 | 换牌「确认」按钮（蓝） | `mulligan_confirm_roi` | 框住换牌界面的确认按钮 |
-| 3 | 盒子「AI胜率」浮动条（橙） | `ai_win_rate_roi` | 框住左上角 AI胜率浮动条（兜底区域自动跟着外扩） |
+| 1 | 盒子推荐面板（绿，**已废弃**） | `recommendation_roi` | 仅框位预览；推荐已改读盒子 JSON |
+| 2 | 换牌「确认」按钮（蓝，**已废弃**） | `mulligan_confirm_roi` | 仅框位预览；换牌不再检测确认按钮 |
+| 3 | 盒子「AI胜率」浮动条（橙，**已废弃**） | `ai_win_rate_roi` | 仅框位预览；AI 胜率改读盒子推送 |
 | 4 | 结算「开始」按钮（青绿） | `post_game_start_roi` | 框住每局结束底部的「开始」按钮：脚本用它判断结算界面点完没有，并点它的正中心 |
-| 5 | 段位数字（淡紫） | `post_game_rank_roi` | 框住结算界面右上角的段位名次数字：有数字=已上传说，数字就是名次 |
+| 5 | 段位数字（淡紫，**已废弃**） | `post_game_rank_roi` | 仅框位预览；名次改读盒子排行接口 |
 | 6 | 主界面「传统对战」（金） | `main_menu_battle_roi` | **贴住那四个字**（不用框整条银条）：脚本在框 ±40px 内用这四个字的图案找它，认到就点认到的位置 |
 | 7 | 选择套牌「选择套牌」标题（粉） | `deck_select_title_roi` | 框住顶部那四个字。**判界面靠它，绝不能用右下角「开始」**（没选中卡组时「开始」不出现） |
 | 8 | 选择套牌 9 个卡组（天蓝） | `deck_grid_roi` | 框住 9 个卡组**整块**区域：脚本按 3×3 均分得到 9 个点击点，只有名牌上有字的格子才会被点 |
@@ -65,9 +65,8 @@
 `RecommendationConfig`）。校准窗口只能在自动化**没在跑**的时候打开，所以
 "存完再点一次「开始对战」"就生效，不需要重启脚本进程、也不需要重开一局对战。
 
-原理：盒子推荐面板顶部才是「打法参考A」红头标题；面板没被框进推荐区域时
-OCR 读不到信标 → 程序判定面板不存在 → 回合内 recommendation_not_stable
-重试——这正是「回合开始无法打牌」最常见的原因。校准 = 让截图区域与面板重合。
+说明：1/2/3/5 号框已经**不参与自动化**（推荐走盒子 JSON、胜率走推送、名次走排行接口），
+保留它们只为兼容旧配置和框位预览；需要真正影响运行的是 4/6/7/8/9-12 号目标。
 
 注意：无需管理员权限——本工具只画框+截图，不模拟鼠标/键盘。
 """
@@ -122,7 +121,7 @@ MOVE_CROSS_MIN_HALF = 6
 
 # 顶部提示条的重判间隔（与 region_overlay 保持一致）。
 PANEL_REFRESH_SECONDS = 1.5
-# OCR 预览的自动刷新间隔（秒）：只在校准「推荐面板」时跑，避免拖框时满核。
+# 面板预览的自动刷新间隔（秒）：只在校准「推荐面板」时跑，避免拖框时满核。
 OCR_REFRESH_SECONDS = 2.5
 
 # ---------------------------------------------------------------- 配色（RGBA）
@@ -362,11 +361,11 @@ class CalibrationSession:
         # 目标条高度按"当前目标说明的换行行数"算：说明绝不能穿出卡片。
         self._card_h_cache: dict[str, int] = {}
 
-        # OCR 预览
+        # 面板预览（OCR 已移除）
         self.last_crop = None
         self.crop_event = threading.Event()
         self.ocr_result = {"status": "loading", "lines": [], "beacon": None,
-                           "msg": "正在加载 OCR 引擎……"}
+                           "msg": "预览已停用（OCR 已移除）"}
 
     # ------------------------------------------------------------ 目标
     @property
@@ -698,7 +697,7 @@ class CalibrationSession:
     # `_boxes_to_save()` / `save()` 见下面「坐标口径 / 实时跟随」一节：保存要先把
     # 各框按当前客户区几何同步（见 `_sync_boxes`），所以和它们放在一起。
 
-    # ------------------------------------------------------------ OCR
+    # ------------------------------------------------------- 预览（已停用）
     def _grab_crop(self, box):
         """抓一块屏幕，返回 PIL RGB 图（失败返回 None）。"""
         from PIL import ImageGrab
@@ -1224,7 +1223,7 @@ class CalibrationSession:
         draw.rectangle((left, top, right, bottom), fill=PANEL_BG,
                        outline=PANEL_BORDER, width=2)
         self._draw_text(draw, (left + 10, top + 8),
-                        "推荐区域预览（OCR 实时识别）", 14, TEXT_MAIN)
+                        "面板预览（OCR 已移除，仅看框位）", 14, TEXT_MAIN)
         img_top = top + 32
         area_w = right - left - 20
         crop = self.last_crop

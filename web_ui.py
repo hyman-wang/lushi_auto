@@ -8,7 +8,7 @@
     python web_ui.py [--no-browser]
 
 功能:
-    * 页面配置用户 ID 与炉石日志目录（写入 constants 并持久化到 ui_config.json）
+    * 用户 ID 自动从盒子首页读取（缓存到 ui_config.json）；页面只配置炉石日志目录
     * 定时任务：开始时间不能早于当前时间；到达结束时间后，
       先等本局对战打完（状态机回到非对局状态）再自动终止自动化
     * 「开始对战」按钮立即启动，「本局结束后停止」「立即停止」手动控制
@@ -684,7 +684,7 @@ CTRL = _Controller()
 
 
 def _apply_constants(name: str, log_root: str):
-    """把页面配置注入 constants，并同步到已导入模块的绑定副本。"""
+    """把配置注入 constants，并同步到已导入模块的绑定副本。"""
     import constants.constants as cc
     if name:
         cc.YOUR_NAME = name
@@ -702,6 +702,50 @@ def _apply_constants(name: str, log_root: str):
         CTRL.fsm.HEARTHSTONE_LOG_ROOT = cc.HEARTHSTONE_LOG_ROOT
         CTRL.fsm.log_state.HEARTHSTONE_LOG_ROOT = cc.HEARTHSTONE_LOG_ROOT
         CTRL.fsm.log_state.MY_NAME = cc.YOUR_NAME
+
+
+# ---------------------------------------------------------------- 盒子账号
+# 用户 ID 不再手填：盒子首页右上角就是当前登录的战网完整昵称（如 昵称#12345）。
+# 盒子没开/没登录时读不到，就继续用 ui_config.json 里上次缓存的名字。
+_OWN_PLAYER_SOURCE = None
+_OWN_PLAYER_LOCK = threading.Lock()
+
+
+def _read_box_player_tag() -> str:
+    global _OWN_PLAYER_SOURCE
+    with _OWN_PLAYER_LOCK:
+        try:
+            if _OWN_PLAYER_SOURCE is None:
+                from src.recommendation.cdp_source import CdpOwnPlayerSource
+                _OWN_PLAYER_SOURCE = CdpOwnPlayerSource(timeout=1.0)
+            return _OWN_PLAYER_SOURCE.btag() or ""
+        except Exception:
+            return ""
+
+
+def _sync_name_from_box() -> bool:
+    """把盒子首页读到的战网昵称写入配置；读不到/没变化返回 False。"""
+    tag = _read_box_player_tag()
+    if not tag:
+        return False
+    cfg = load_config()
+    if (cfg.get("name") or "").strip() == tag:
+        return False
+    cfg["name"] = tag
+    save_config(cfg)
+    _apply_constants(tag, cfg.get("log_root") or "")
+    _log("SYS", f"已从盒子读取战网昵称：{tag}")
+    return True
+
+
+def _box_player_sync_loop():
+    """盒子换账号/重新登录后，自动跟进最新的战网昵称。"""
+    while True:
+        try:
+            _sync_name_from_box()
+        except Exception:
+            pass
+        time.sleep(20)
 
 
 def _persist_schedule(start_dt, end_dt):
@@ -763,7 +807,7 @@ def _start_automation(reset_stats: bool = True):
         _log("SYS", f"自动化恢复：用户 {name}，日志目录 {log_root}"
                     f"（战绩继续累计：已完成 {int(getattr(fsm, 'game_count', 0) or 0)} 场）")
     if name and "#" not in name:
-        _log("WARN", "用户 ID 未包含 #编号，可能无法识别己方玩家，建议填写完整战网昵称。")
+        _log("WARN", "盒子昵称未包含 #编号，可能无法识别己方玩家。")
     _stdout_capture_start()
     _register_hotkey()
     t = threading.Thread(target=_automation_worker, args=(fsm,),
@@ -1341,9 +1385,18 @@ def api_start(body: dict):
             return {"ok": False, "error": "自动化已经在运行中。"}
         cfg = load_config()
         name = (cfg.get("name") or "").strip()
+        if not name:
+            # 首次/盒子刚登录：同步读一次，避免用户还要去别处填昵称。
+            try:
+                _sync_name_from_box()
+            except Exception:
+                pass
+            cfg = load_config()
+            name = (cfg.get("name") or "").strip()
         log_root = (cfg.get("log_root") or "").strip()
         if not name:
-            return {"ok": False, "error": "请先填写用户 ID。"}
+            return {"ok": False,
+                    "error": "还没从盒子读到战网昵称：请先打开并登录炉石盒子，再试一次。"}
         if not log_root:
             return {"ok": False, "error": "请先填写炉石日志目录。"}
         if not os.path.isdir(log_root):
@@ -3320,7 +3373,14 @@ def main():
     threading.Thread(target=_hearthstone_foreground_guard,
                      name="hs-fg-guard", daemon=True).start()
     cfg = load_config()
+    try:
+        _sync_name_from_box()
+    except Exception:
+        pass
+    cfg = load_config()
     _apply_constants(cfg.get("name") or "", cfg.get("log_root") or "")
+    threading.Thread(target=_box_player_sync_loop,
+                     name="hs-box-name", daemon=True).start()
     _boot_resume_schedule()
     # 启动即自检：Python 版本 / 依赖包 / 分辨率和缩放（结果进日志与页面）。
     start_selfcheck_async()

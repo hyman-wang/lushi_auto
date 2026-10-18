@@ -78,8 +78,8 @@ python hsctl.py --json status
 | --- | --- |
 | `running` / `phase` | 是否在跑；`phase`: idle / waiting / playing / stopping / finished |
 | `is_admin` | `false` → 提醒用户用管理员权限 |
-| `name_match.matched` | `false` → 账号不匹配，用 `config set --name "昵称#编号"` 修 |
-| `config.name` / `config.log_root` | 两项都不能空，否则 `start` 会被拒 |
+| `name_match.matched` | `false` → 盒子登录的不是当前战网账号；在盒子里重新登录即可自动跟进（`config set --name` 仅作兜底） |
+| `config.name` / `config.log_root` | `name` 自动从盒子首页读取；`log_root` 必须填，否则 `start` 会被拒 |
 | `overlay_running` / `prepared` | 浮窗是否开着、是否已「就绪」 |
 | `stop_after_game` | `true` 表示已请求「本局结束后停止」 |
 | `games` / `wins` / `win_rate` | 战绩 |
@@ -98,7 +98,7 @@ python hsctl.py serve task-status
 #   任务不在 → python hsctl.py serve install-task          （非管理员会打印一条命令给用户）
 
 # ③ 修配置（只在需要时）
-python hsctl.py config set --name "Player#12345" --log-root "D:\Hearthstone\Logs"
+python hsctl.py config set --log-root "D:\Hearthstone\Logs"
 
 # ④ 准备（开浮窗 + 切炉石前台，不开打）
 python hsctl.py prepare
@@ -227,7 +227,7 @@ python hsctl.py concede set --enabled --threshold 12 --rounds 4
 python hsctl.py rank-stop set --enabled --mode legend_number --legend-number 500 --action stop
 # 控分：名次数值 < 500（名次比目标更靠前）就开局投降，压到 >= 500 再正常打
 python hsctl.py rank-stop set --enabled --mode legend_number --legend-number 500 --action keep
-python hsctl.py config set --name "昵称#编号"
+python hsctl.py config set --log-root "D:\Hearthstone\Logs"   # 昵称自动从盒子读取
 
 # 浮窗 / 校准 / 定时
 python hsctl.py overlay on|off|toggle
@@ -296,7 +296,7 @@ python hsctl.py serve stop --hard                # 跳过自停，直接结束�
 | `自动化运行中，请先停止后再修改…` | 该命令没带 `hot`。参数类命令默认带；若你显式加了 `--no-hot`，去掉它 |
 | `自动化已经在运行中。` | 别重复 `start`；先看 `status` |
 | `当前没有正在运行的自动化。` | `stop` 没意义；先 `start` |
-| `请先填写用户 ID / 炉石日志目录` | `config set` 补上 |
+| `还没从盒子读到战网昵称…` | 先打开并登录炉石盒子；盒子首页右上角就是当前昵称 |
 | `日志目录不存在：…` | 路径写错了；用 `--log-root` 改对 |
 | `必须介于 a–b` | 数值越界，按提示范围改 |
 | `没找到正在运行的控制台` | 退出码 3：`serve start`，或让用户启动脚本 |

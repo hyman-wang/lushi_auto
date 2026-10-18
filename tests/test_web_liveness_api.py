@@ -200,10 +200,13 @@ class WebPageTests(unittest.TestCase):
     def test_page_posts_to_the_liveness_api(self):
         self.assertIn('post("/api/liveness"', self.html)
 
-    def test_page_warns_about_fullscreen_and_full_nickname(self):
+    def test_page_warns_about_fullscreen(self):
         self.assertIn("全屏", self.html)
         self.assertIn("最大化", self.html)
-        self.assertIn("#编号", self.html)
+
+    def test_page_has_no_manual_user_id_input(self):
+        self.assertNotIn('id="inpName"', self.html)
+        self.assertIn("自动从盒子", self.html)
 
 
 if __name__ == "__main__":

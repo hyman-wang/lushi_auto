@@ -209,11 +209,6 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
     <section class="card">
       <h2 class="card-title">👤 基础配置</h2>
       <label class="field">
-        <span class="field-label">用户 ID（战网完整昵称）</span>
-        <input id="inpName" type="text" placeholder="例如：你的昵称#12345">
-        <span class="field-hint">必须与当前战网账号的<b>完整昵称</b>一致（含 <b>#编号</b>）。换了账号务必同步修改：脚本靠昵称区分敌我，不匹配会把整局都当成对手回合而<b>一直不出牌</b>。脚本读到日志玩家名后会自动比对并在下方提示。</span>
-      </label>
-      <label class="field">
         <span class="field-label">炉石日志目录（Logs 文件夹）</span>
         <div class="input-row">
           <input id="inpLog" type="text" placeholder="例如：D:HearthstoneLogs">
@@ -221,8 +216,8 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
         </div>
         <span class="field-hint" id="logHint"></span>
       </label>
-      <div class="hint-line" id="nameMatch" style="margin-top:2px">账号校验：等待读到对局日志中的玩家名…</div>
-      <div class="hint-line">💡 配置在输入框失焦时自动保存，无需再修改 constants.py；自动化运行期间不可修改。</div>
+      <div class="hint-line" id="nameMatch" style="margin-top:2px">账号：等待从盒子读取战网昵称…</div>
+      <div class="hint-line">💡 配置在输入框失焦时自动保存，无需再修改 constants.py；自动化运行期间不可修改。用户 ID 自动从盒子首页读取，不需要手填。</div>
     </section>
 
     <section class="card">
@@ -536,7 +531,7 @@ function fmtCountdown(targetMs){
 /* ---------- 全局状态 ---------- */
 var lastStatus = null;
 var logSeq = 0;
-var dirty = {name:false, log:false};
+var dirty = {log:false};
 var dirtyConcede = false;
 var dirtyDelays = false;
 var dirtyHumanLike = false;
@@ -582,9 +577,9 @@ function renderBanners(s){
   if (nm && nm.matched === false){
     var nmNames = [];
     for (var k in (nm.players || {})) nmNames.push(nm.players[k]);
-    html += '<div class="banner banner-warn"><span>🪪</span><div>用户 ID 与日志玩家名<b>不匹配</b>：日志中玩家为 <b>'
-         + esc(nmNames.join(" / ")) + '</b>，当前配置为 <b>' + esc(nm.config || "(空)")
-         + '</b>。<br>请把「用户 ID」改成现在的<b>完整战网昵称（含 #编号）</b>，否则脚本会把整局都当成对手回合而<b>不出牌</b>。</div></div>';
+    html += '<div class="banner banner-warn"><span>🪪</span><div>盒子账号与日志玩家名<b>不匹配</b>：日志中玩家为 <b>'
+         + esc(nmNames.join(" / ")) + '</b>，盒子账号为 <b>' + esc(nm.config || "(空)")
+         + '</b>。<br>请确认炉石盒子登录的是当前战网账号（必要时重新登录盒子），否则脚本会把整局都当成对手回合而<b>不出牌</b>。</div></div>';
   }
   if (s.phase === "finished" && s.last_summary){
     var sm = s.last_summary;
@@ -626,13 +621,11 @@ function render(s){
   $("btnStopNow").disabled = !running;
   $("btnSchedule").disabled = busy;
   $("btnCancelSched").disabled = s.phase !== "waiting";
-  $("inpName").disabled = busy;
   $("inpLog").disabled = busy;
   $("btnCheckLog").disabled = busy;
   $("inpStart").disabled = busy;
   $("inpEnd").disabled = busy;
 
-  if (!dirty.name) $("inpName").value = s.config.name || "";
   if (!dirty.log) $("inpLog").value = s.config.log_root || "";
   if (s.concede && !dirtyConcede){
     $("chkConcede").checked = !!s.concede.enabled;
@@ -813,16 +806,16 @@ function render(s){
   var nm = s.name_match;
   if (nm){
     if (nm.matched === true){
-      $("nameMatch").textContent = "账号校验：✅ 日志玩家名与配置一致（" + nm.config + "）";
+      $("nameMatch").textContent = "账号：✅ 盒子账号与日志一致（" + nm.config + "）";
       $("nameMatch").style.color = "var(--green)";
     } else if (nm.matched === false){
       var names = [];
       for (var pid in (nm.players || {})) names.push(nm.players[pid]);
-      $("nameMatch").textContent = "账号校验：❌ 不匹配！日志中玩家为 " + names.join(" / ")
-        + "，当前配置为 " + (nm.config || "(空)") + " —— 请改成完整战网昵称（含 #编号），否则整局不出牌";
+      $("nameMatch").textContent = "账号：❌ 不匹配！日志中玩家为 " + names.join(" / ")
+        + "，盒子账号为 " + (nm.config || "(空)") + " —— 请确认盒子登录的是当前账号（重新登录盒子），否则整局不出牌";
       $("nameMatch").style.color = "var(--red)";
     } else {
-      $("nameMatch").textContent = "账号校验：等待读到对局日志中的玩家名…（配置：" + (nm.config || "空") + "）";
+      $("nameMatch").textContent = "账号：等待从盒子读取战网昵称…（当前：" + (nm.config || "空") + "）";
       $("nameMatch").style.color = "var(--muted)";
     }
   }
@@ -933,7 +926,6 @@ function refreshClock(){
 }
 
 /* ---------- 配置 ---------- */
-$("inpName").addEventListener("input", function(){ dirty.name = true; });
 $("inpLog").addEventListener("input", function(){ dirty.log = true; });
 $("chkConcede").addEventListener("change", function(){ dirtyConcede = true; });
 $("inpConcedeThreshold").addEventListener("input", function(){ dirtyConcede = true; });
@@ -942,20 +934,18 @@ $("inpConcedeRounds").addEventListener("input", function(){ dirtyConcede = true;
   .forEach(function(id){ $(id).addEventListener("input", function(){ dirtyDelays = true; }); });
 
 function saveConfig(){
-  post("/api/config", {name:$("inpName").value.trim(), log_root:$("inpLog").value.trim()})
+  post("/api/config", {log_root:$("inpLog").value.trim()})
     .then(function(r){
       if (r.ok){
         toast(r.message || "配置已保存", "ok");
         (r.warnings || []).forEach(function(w){ toast(w, "warn"); });
-        dirty.name = false; dirty.log = false;
+        dirty.log = false;
       } else {
         toast(r.error || "保存失败", "error");
       }
     });
 }
-$("inpName").addEventListener("blur", saveConfig);
 $("inpLog").addEventListener("blur", saveConfig);
-$("inpName").addEventListener("keydown", function(e){ if (e.key === "Enter") this.blur(); });
 $("inpLog").addEventListener("keydown", function(e){ if (e.key === "Enter") this.blur(); });
 
 $("btnCheckLog").addEventListener("click", function(){

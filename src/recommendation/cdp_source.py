@@ -546,3 +546,26 @@ class CdpLadderStatsSource(_CdpPageSource):
             "max_level": (info.get("max_chuanshuo_rank") or {}).get("level"),
             "season": info.get("season"),
         }
+
+
+class CdpOwnPlayerSource(_CdpPageSource):
+    """从盒子首页（client-home）读取当前登录的战网完整昵称。
+
+    盒子首页右上角 ``.home-info-account-btag`` 就是 ``昵称#编号``；
+    读不到时退化为整页文本里的第一个 ``xxx#12345``。只读 DOM，不点任何东西。
+    """
+
+    TARGET_HINTS = ("client-home",)
+    HOOK_JS = "1"
+    READ_JS = (
+        "JSON.stringify({h:1, btag:(()=>{"
+        "const el=document.querySelector('.home-info-account-btag');"
+        "if(el&&el.textContent)return el.textContent.trim();"
+        "const m=(document.body?document.body.innerText:'').match(/[^\\s#]{1,32}#\\d{3,8}/);"
+        "return m?m[0]:'';})()})"
+    )
+
+    def btag(self) -> Optional[str]:
+        data = self.read() or {}
+        value = str(data.get("btag") or "").strip()
+        return value or None

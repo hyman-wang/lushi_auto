@@ -252,7 +252,7 @@ python hsctl.py deck --clear   # 关掉（保持你手选的卡组）
 | `concede [set …]` | 自动投降：`--enabled/--no-enabled`、`--threshold`（%）、`--rounds` |
 | `concede now` | **手动投降**：立刻点「齿轮 → 认输」。对战中随时可用，**不需要先停自动化**（自动打的时候想立刻认输用它） |
 | `rank-stop [set …]` | 段位目标：`--enabled/--no-enabled`、`--mode legend\|legend_number`、`--legend-number N`、`--action stop\|keep`（`stop`=达到后停止；`keep`=控分，名次数值比目标更靠前就开局投降） |
-| `config [set …]` | 账号与日志目录：`--name`（含 `#编号`）、`--log-root`。带 `hot` 时会立刻注入运行中的日志读取器（`log_state.MY_NAME`），后续昵称判定即用新值 |
+| `config [set …]` | 日志目录：`--log-root`。`--name` 仅作兜底（正常从盒子首页自动读取，含 `#编号`）；带 `hot` 时会立刻注入运行中的日志读取器（`log_state.MY_NAME`），后续昵称判定即用新值 |
 
 延时字段（`_USER_DELAY_KEYS`）与生效时机：
 
@@ -446,7 +446,7 @@ python hsctl.py env --pin auto     # 自动选第一个合格候选
                                      · 任务在 → hsctl serve start --via-task（不弹 UAC）
                                      · 任务不在 → hsctl serve install-task
                                        （非管理员会打印一条让你/用户粘的命令）
-3. 检查 name_match.matched        → false 就用 hsctl config set --name 纠正
+3. 检查 name_match.matched        → false 说明盒子登录的不是当前战网账号：在盒子里重新登录；`hsctl config set --name` 仅兜底
 4. hsctl prepare                  → 确认浮窗/前台就绪，再 hsctl start
 5. hsctl log -f                   → 跟随日志观察；或 hsctl --json status --watch 2
 6. 需要时热改：hsctl delays set … / hsctl liveness set … / hsctl watchdog set …

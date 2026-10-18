@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from typing import Any, Optional
 from urllib.parse import urlsplit, urlunsplit
 
+from . import journal
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9222
 
@@ -489,8 +491,13 @@ class CdpRecommendationSource(_CdpPageSource):
                 pass
             self.last_error = self._panel_notice()
             return None
-        return RecommendationSnapshot(
+        snapshot = RecommendationSnapshot(
             version=version, payload=payload, received_at=time.time())
+        try:
+            journal.record_snapshot(snapshot)
+        except Exception:
+            pass
+        return snapshot
 
 
 # ---------------------------------------------------------------------------

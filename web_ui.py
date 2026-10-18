@@ -756,15 +756,23 @@ def _box_player_sync_loop():
 
 
 def _warm_recommendation_hook():
-    """提前挂上盒子推荐 hook，避免开局推荐已推送、脚本 15s 后才连接而错过。"""
+    """提前挂上盒子推荐/胜率 hook，避免推送早于脚本首次读取而错过。"""
     try:
-        from src.recommendation.cdp_source import CdpRecommendationSource
-        source = CdpRecommendationSource(timeout=1.0, retry_interval=2.0)
+        from src.recommendation.cdp_source import (
+            CdpRecommendationSource, CdpWinrateSource,
+        )
+        recommendation = CdpRecommendationSource(timeout=1.0,
+                                                 retry_interval=2.0)
+        winrate = CdpWinrateSource(timeout=1.0, retry_interval=2.0)
     except Exception:
         return
     while True:
         try:
-            source.snapshot()
+            recommendation.snapshot()
+        except Exception:
+            pass
+        try:
+            winrate.latest()
         except Exception:
             pass
         time.sleep(2)

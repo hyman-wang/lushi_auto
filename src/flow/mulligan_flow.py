@@ -15,6 +15,8 @@ class MulliganResult:
     status: MulliganStatus
     selected_zero_based_slots: tuple[int, ...] = ()
     diagnostics: str = ""
+    instruction: str = ""
+    frame_id: str = ""
 
 
 class MulliganFlow:
@@ -96,7 +98,10 @@ class MulliganFlow:
                     self.post_action_pause()
                 except Exception:
                     pass
-            return MulliganResult(MulliganStatus.CONFIRMED, selected)
+            return MulliganResult(
+                MulliganStatus.CONFIRMED, selected,
+                instruction=getattr(action, "normalized_instruction", "") or "",
+                frame_id=getattr(action, "frame_id", "") or "")
         except Exception as exc:
             try:
                 self.executor.cancel_click()

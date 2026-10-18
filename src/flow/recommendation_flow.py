@@ -18,6 +18,7 @@ import time
 
 from src.flow.hand_animation_delay import HandAnimationDelay
 from src.recommendation_models import ActionKind
+from src.recommendation import journal as recommendation_journal
 from src.safety.recommendation_validator import ConsumedActionStore
 
 
@@ -189,11 +190,25 @@ class RecommendationFlow:
             print("[执行] 开始点击。")
             result = self.controller.execute(adapted.manual_action, fresh_state)
             if not result.executed or result.recovery_needed:
+                try:
+                    recommendation_journal.record_execution(
+                        "battle", snapshot.version,
+                        proposed.normalized_instruction, "failed",
+                        detail=str(getattr(adapted, "action", "")))
+                except Exception:
+                    pass
                 return FlowStepResult(FlowStepStatus.RETRY,
                                       "execution_failed")
             # 同一条推荐只执行一次（盒子推送版本是幂等键）。
             self._executed_version = snapshot.version
             self._acted_this_turn = True
+            try:
+                recommendation_journal.record_execution(
+                    "battle", snapshot.version,
+                    proposed.normalized_instruction, "executed",
+                    detail=str(getattr(adapted, "action", "")))
+            except Exception:
+                pass
 
             # 操作结束后再读下一条推荐（盒子更新面板需要时间）。
             paused = False

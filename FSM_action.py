@@ -28,6 +28,7 @@ from src.game_state.recommendation_adapter import adapt_action
 from src.recommendation.cdp_source import (
     CdpLadderStatsSource, CdpRecommendationSource, CdpWinrateSource,
 )
+from src.recommendation import journal as recommendation_journal
 from src.recommendation.mapper import payload_to_action
 from config import RecommendationConfig
 from src.recommendation_models import ActionKind
@@ -61,6 +62,8 @@ recommendation_config = None
 MULLIGAN_RECOMMENDATION_FALLBACK_SECONDS = 45.0
 _last_mulligan_recommendation_version = None
 _last_mulligan_source_error = None
+_last_mulligan_consumed_version = None
+_current_mulligan_version = None
 # 推荐来源：盒子 CEF 页面推送的 JSON（DevTools/CDP），不再截图/OCR。
 recommendation_source = None
 # AI 胜率来源：winrate-predict 页面的推送（同样是 CEF JSON）。
@@ -160,6 +163,7 @@ def initialize_recommendation_automation():
 
     def read_mulligan_action():
         global _last_mulligan_recommendation_version, _last_mulligan_source_error
+        global _current_mulligan_version
         # 换牌建议同样来自盒子推送（actionName == "replace"）。
         snapshot = recommendation_source.snapshot()
         if snapshot is None:
@@ -171,6 +175,9 @@ def initialize_recommendation_automation():
                 info_print(f"[推荐] 换牌读取失败：{target}；{detail}")
             raise RuntimeError(
                 f"recommendation_source_unavailable（{target}；{detail}）")
+        if (snapshot.version == _last_mulligan_consumed_version):
+            raise RuntimeError("stale_mulligan_recommendation")
+        _current_mulligan_version = snapshot.version
         _last_mulligan_source_error = None
         if snapshot.version != _last_mulligan_recommendation_version:
             _last_mulligan_recommendation_version = snapshot.version
@@ -714,6 +721,17 @@ def ChoosingCardAction():
                 confirmed_waiting = True
                 verified = False
                 confirmed_at = time.time()
+                global _last_mulligan_consumed_version
+                _last_mulligan_consumed_version = _current_mulligan_version
+                try:
+                    recommendation_journal.record_execution(
+                        "mulligan",
+                        getattr(result, "frame_id", "") or "unknown",
+                        getattr(result, "instruction", "") or "",
+                        "confirmed",
+                        detail=str(getattr(result, "selected_zero_based_slots", "")))
+                except Exception:
+                    pass
                 _report_mulligan_diagnostic(
                     "confirmed", "已执行换牌，等待对局开始……")
                 time.sleep(0.3)
@@ -736,6 +754,12 @@ def ChoosingCardAction():
                     confirmed_waiting = True
                     verified = False
                     confirmed_at = time.time()
+                    try:
+                        recommendation_journal.record_execution(
+                            "mulligan", "fallback", "保留全部卡牌",
+                            "fallback_keep_all")
+                    except Exception:
+                        pass
                     _report_mulligan_diagnostic(
                         "fallback_confirm",
                         "已兜底确认留牌（保留全部），等待对局开始……")

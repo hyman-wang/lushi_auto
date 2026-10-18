@@ -1,4 +1,5 @@
 import _thread
+import json
 import random
 import re
 import sys
@@ -56,6 +57,10 @@ manual_controller = ManualController(
 auto_mulligan_flow = None
 recommendation_flow = None
 recommendation_config = None
+# 换牌推荐长时间读不到时的兜底：直接确认“保留全部”，避免无限重试。
+MULLIGAN_RECOMMENDATION_FALLBACK_SECONDS = 45.0
+_last_mulligan_recommendation_version = None
+_last_mulligan_source_error = None
 # 推荐来源：盒子 CEF 页面推送的 JSON（DevTools/CDP），不再截图/OCR。
 recommendation_source = None
 # AI 胜率来源：winrate-predict 页面的推送（同样是 CEF JSON）。
@@ -154,13 +159,27 @@ def initialize_recommendation_automation():
             recommendation_config)
 
     def read_mulligan_action():
+        global _last_mulligan_recommendation_version, _last_mulligan_source_error
         # 换牌建议同样来自盒子推送（actionName == "replace"）。
         snapshot = recommendation_source.snapshot()
         if snapshot is None:
             target = getattr(recommendation_source, "target_url", None) or "no-target"
             detail = getattr(recommendation_source, "last_error", None) or "no-data"
+            error_key = f"{target}|{detail}"
+            if error_key != _last_mulligan_source_error:
+                _last_mulligan_source_error = error_key
+                info_print(f"[推荐] 换牌读取失败：{target}；{detail}")
             raise RuntimeError(
                 f"recommendation_source_unavailable（{target}；{detail}）")
+        _last_mulligan_source_error = None
+        if snapshot.version != _last_mulligan_recommendation_version:
+            _last_mulligan_recommendation_version = snapshot.version
+            try:
+                info_print(
+                    "[推荐] 换牌读取 JSON："
+                    + json.dumps(snapshot.payload, ensure_ascii=False)[:1200])
+            except Exception:
+                pass
         action = payload_to_action(
             snapshot.payload,
             turn_number=log_state.game_num_turns_in_play,
@@ -168,6 +187,7 @@ def initialize_recommendation_automation():
             frame_id="cdp-%d" % snapshot.version)
         if action.action != ActionKind.MULLIGAN:
             raise RuntimeError("recommendation_is_not_mulligan")
+        info_print(f"[推荐] 换牌动作：{action.normalized_instruction}")
         return action
 
     auto_mulligan_flow = MulliganFlow(
@@ -651,6 +671,8 @@ def ChoosingCardAction():
         confirmed_waiting = False
         verified = False
         confirmed_at = 0.0
+        mulligan_loop_started = time.monotonic()
+        fallback_done = False
         # 重试间隔（面板未就绪/推荐暂不可执行/确认未消失时每轮等待）。
         # 不复用 post_ocr（那是“识别→点击”缓冲）：上游 post_ocr=0 时，
         # 若重试也取 0 会变成 0 秒忙等（CPU 空转 + 疯狂截图）。独立默认 5s。
@@ -678,6 +700,9 @@ def ChoosingCardAction():
                 if time.time() - confirmed_at > 15:
                     confirmed_waiting = False
                     verified = False
+                    if fallback_done:
+                        warn_print("兜底确认留牌后 15s 仍未进入对局，停止本轮自动化。")
+                        return FSM_ERROR
                     _report_mulligan_diagnostic(
                         "confirm_timeout",
                         "换牌确认后 15s 仍未进入对局，重新执行……")
@@ -696,6 +721,28 @@ def ChoosingCardAction():
             message = f"换牌推荐暂不可执行，继续重试：{result.diagnostics}"
             # 换牌面板已不在/阶段已变更时给出更明确提示，避免误以为卡死。
             diag = result.diagnostics
+            stale = ("recommendation_source_unavailable" in diag
+                     or "recommendation_is_not_mulligan" in diag)
+            if (not fallback_done and stale
+                    and time.monotonic() - mulligan_loop_started
+                    >= MULLIGAN_RECOMMENDATION_FALLBACK_SECONDS):
+                fallback_done = True
+                info_print(
+                    f"[推荐] {MULLIGAN_RECOMMENDATION_FALLBACK_SECONDS:.0f}s "
+                    "仍未读到可执行的换牌推荐，直接确认保留全部卡牌……")
+                try:
+                    with click.hearthstone_action_session():
+                        click.commit_choose_card()
+                    confirmed_waiting = True
+                    verified = False
+                    confirmed_at = time.time()
+                    _report_mulligan_diagnostic(
+                        "fallback_confirm",
+                        "已兜底确认留牌（保留全部），等待对局开始……")
+                    continue
+                except Exception as exc:
+                    warn_print(f"兜底确认留牌失败：{type(exc).__name__}: {exc}")
+                    return FSM_ERROR
             if (diag == "recommendation_is_not_mulligan"
                     or diag.endswith(":recommendation_is_not_mulligan")
                     or diag == "mulligan_stage_changed"

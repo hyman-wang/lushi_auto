@@ -13,6 +13,7 @@
 from dataclasses import dataclass
 from enum import Enum
 import inspect
+import json
 import time
 
 from src.flow.hand_animation_delay import HandAnimationDelay
@@ -103,6 +104,8 @@ class RecommendationFlow:
         self._executed_version = None
         # 最近一次成功读到的版本（诊断/日志用）。
         self.last_version = None
+        self._logged_version = None
+        self._logged_source_error = None
         self.last_error = None
         self.waiting_instruction = None
         self.waiting_turn_number = None
@@ -121,10 +124,25 @@ class RecommendationFlow:
             snapshot = self.source.snapshot()
             if snapshot is None:
                 self.last_error = getattr(self.source, "last_error", None)
+                target = getattr(self.source, "target_url", None) or "no-target"
+                detail = self.last_error or "no-data"
+                error_key = f"{target}|{detail}"
+                if error_key != self._logged_source_error:
+                    self._logged_source_error = error_key
+                    print(f"[推荐] 读取失败：{target}；{detail}")
                 return FlowStepResult(
-                    FlowStepStatus.RETRY, "recommendation_source_unavailable")
+                    FlowStepStatus.RETRY,
+                    f"recommendation_source_unavailable（{target}；{detail}）")
             self.last_version = snapshot.version
             self.last_error = None
+            self._logged_source_error = None
+            if snapshot.version != self._logged_version:
+                self._logged_version = snapshot.version
+                try:
+                    raw = json.dumps(snapshot.payload, ensure_ascii=False)
+                    print(f"[推荐] 读取 JSON：{raw[:1200]}")
+                except Exception:
+                    pass
 
             if snapshot.version == self._executed_version:
                 return FlowStepResult(

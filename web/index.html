@@ -1046,7 +1046,6 @@ function renderSelfcheck(res){
 }
 
 /* ---------- 环境自检：可收起（通过时默认折叠） ---------- */
-var SELFCHECK_COLLAPSED_KEY = "hsSelfcheckCollapsed";
 var selfcheckUserToggled = false;
 var selfcheckLastOk = null;
 
@@ -1057,8 +1056,6 @@ function setSelfcheckCollapsed(collapsed, remember){
   var summary = $("selfcheckSummary");
   if (summary) summary.style.display = collapsed ? "none" : "";
   btn.textContent = collapsed ? "展开" : "收起";
-  if (remember === false) return;
-  try { localStorage.setItem(SELFCHECK_COLLAPSED_KEY, collapsed ? "1" : "0"); } catch(e){}
 }
 
 function initSelfcheckCollapse(){

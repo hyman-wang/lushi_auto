@@ -28,21 +28,17 @@ class SelfcheckCollapsePageTests(unittest.TestCase):
         self.assertIn('body.style.display = collapsed ? "none" : "";', self.html)
         self.assertIn('btn.textContent = collapsed ? "展开" : "收起";', self.html)
 
-    def test_choice_is_remembered_locally(self):
-        self.assertIn('var SELFCHECK_COLLAPSED_KEY = "hsSelfcheckCollapsed";',
+    def test_defaults_to_collapsed(self):
+        self.assertIn("setSelfcheckCollapsed(true, false);", self.html)
+
+    def test_failure_auto_expands_without_saving_a_preference(self):
+        self.assertIn("if (!isOk) {", self.html)
+        self.assertIn("setSelfcheckCollapsed(false, false);", self.html)
+
+    def test_summary_is_hidden_while_collapsed(self):
+        """通过时只留徽标；明细和结论行都收起，失败时自动展开。"""
+        self.assertIn('summary.style.display = collapsed ? "none" : "";',
                       self.html)
-        self.assertIn("localStorage.setItem(SELFCHECK_COLLAPSED_KEY", self.html)
-        self.assertIn("localStorage.getItem(SELFCHECK_COLLAPSED_KEY)", self.html)
-
-    def test_defaults_to_expanded(self):
-        self.assertIn("setSelfcheckCollapsed(saved === \"1\", false);", self.html)
-
-    def test_failure_auto_expands_without_overwriting_the_preference(self):
-        self.assertIn("if (!res.ok) setSelfcheckCollapsed(false, false);",
-                      self.html)
-
-    def test_summary_stays_visible_when_collapsed(self):
-        """收起只藏明细；通过/待修的结论行与徽章必须一直看得见。"""
         head = self.html.split('id="selfcheckBody"', 1)[0]
 
         self.assertIn('id="selfcheckSummary"', head)

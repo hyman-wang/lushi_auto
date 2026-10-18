@@ -35,12 +35,15 @@ body{
 }
 /* ---------- 顶栏 ---------- */
 .header{border-bottom:1px solid var(--border);background:linear-gradient(180deg,#1d160c,#14100a 72%,transparent)}
-.header-inner{max-width:1180px;margin:0 auto;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.logo{display:flex;align-items:center;gap:14px}
-.logo-icon{font-size:34px;filter:drop-shadow(0 3px 10px rgba(232,185,59,.4))}
-.logo h1{font-family:Georgia,"Songti SC","SimSun",serif;font-size:23px;letter-spacing:1px;background:linear-gradient(90deg,#f7d97e,#d9a62e);-webkit-background-clip:text;background-clip:text;color:transparent}
-.logo p{font-size:12px;color:var(--muted);margin-top:2px}
-.header-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.header-inner{max-width:1420px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-icon{font-size:24px;filter:drop-shadow(0 3px 10px rgba(232,185,59,.4))}
+.logo h1{font-family:Georgia,"Songti SC","SimSun",serif;font-size:19px;letter-spacing:1px;background:linear-gradient(90deg,#f7d97e,#d9a62e);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo p{display:none}
+.header-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.header-stats b{color:var(--gold-bright);font-size:13px;margin-left:2px}
+.header-elapsed{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 /* ---------- 开源地址条（页面最醒目位置，紧贴顶栏） ---------- */
 .repo-bar{background:linear-gradient(90deg,rgba(232,185,59,.18),rgba(232,185,59,.07) 55%,transparent);border-bottom:1px solid var(--border)}
 .repo-bar-inner{max-width:1180px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -48,8 +51,8 @@ body{
 .repo-bar a.repo-link{font-family:Consolas,"Courier New",monospace;font-weight:700;font-size:15px;color:#241a05;background:linear-gradient(180deg,#f2cd66,#d9a62e);border:1px solid #8a6a1c;border-radius:999px;padding:6px 16px;text-decoration:none;box-shadow:0 4px 16px rgba(232,185,59,.28);transition:filter .15s,transform .15s}
 .repo-bar a.repo-link:hover{color:#241a05;border-color:#8a6a1c;filter:brightness(1.08);transform:translateY(-1px)}
 .repo-bar-note{color:var(--muted);font-size:12.5px}
-.clock{font-family:Consolas,monospace;color:var(--muted);font-size:13px;text-align:right;line-height:1.5}
-.pill{display:flex;align-items:center;gap:8px;padding:7px 15px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--panel2)}
+.clock{font-family:Consolas,monospace;color:var(--muted);font-size:11px;text-align:right;line-height:1.4}
+.pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--panel2)}
 .pill .dot{width:9px;height:9px;border-radius:50%;background:#8b8071;flex:none}
 .pill.idle .dot{background:#8b8071}
 .pill.waiting .dot{background:var(--blue)}
@@ -174,8 +177,15 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="logo-icon">🏆</div>
       <div>
         <h1>HSLegendArriver</h1>
-        <p>炉石传说 · 自动对战控制台</p>
       </div>
+    </div>
+    <div class="header-stats">
+      <span>状态 <b id="stState">待机</b></span>
+      <span>对局 <b id="stGames">0</b></span>
+      <span>胜 <b id="stWins">0</b></span>
+      <span>认输 <b id="stConcede">0</b></span>
+      <span>胜率 <b id="stRate">--</b></span>
+      <span class="header-elapsed" id="gameElapsedRow" style="display:none">⏱ <b id="stElapsed">0:00</b><span id="stopNote"></span></span>
     </div>
     <div class="header-right">
       <button id="btnToggleDesc" class="btn btn-ghost btn-small" type="button">📝 显示说明</button>
@@ -185,34 +195,10 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
   </div>
 </header>
 
-<!-- 开源项目地址：放在最醒目的位置（顶栏正下方通栏） -->
-<div class="repo-bar">
-  <div class="repo-bar-inner">
-    <span class="repo-bar-label">📦 本开源项目地址：</span>
-    <a class="repo-link" href="https://github.com/hyman-wang/lushi_auto" target="_blank" rel="noopener noreferrer">github.com/hyman-wang/lushi_auto</a>
-    <span class="repo-bar-note">（GPL-3.0 · 完全免费开源，仅用于技术研究与代码交流；觉得有用欢迎点个 ⭐）</span>
-  </div>
-</div>
-
 <div class="container">
   <div id="banners"></div>
 
   <div class="main-grid">
-
-    <section class="card wide">
-      <h2 class="card-title">📊 运行概览</h2>
-      <div class="stats-grid">
-        <div class="stat"><div class="stat-value" id="stState">待机</div><div class="stat-label">当前状态</div></div>
-        <div class="stat"><div class="stat-value" id="stGames">0</div><div class="stat-label">已完成对局</div></div>
-        <div class="stat"><div class="stat-value" id="stWins">0</div><div class="stat-label">胜场</div></div>
-        <div class="stat"><div class="stat-value" id="stConcede">0</div><div class="stat-label">自动认输</div></div>
-        <div class="stat"><div class="stat-value" id="stRate">--</div><div class="stat-label">胜率</div></div>
-      </div>
-      <div class="subrow" id="gameElapsedRow" style="display:none">
-        <span>⏱ 本局已进行 <b id="stElapsed">0:00</b></span>
-        <span id="stopNote"></span>
-      </div>
-    </section>
 
     <section class="card wide" id="cardSelfcheck">
       <h2 class="card-title">

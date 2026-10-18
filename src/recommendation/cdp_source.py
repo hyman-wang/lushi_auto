@@ -388,6 +388,22 @@ _RECOMMEND_READ = (
     "})"
 )
 
+_RECOMMEND_ACTIVATE = r"""
+(() => {
+  try {
+    if (typeof window.onSwitchModule === 'function') {
+      window.onSwitchModule('ladderRecommend');
+    }
+  } catch (e) {}
+  try {
+    if (typeof window.onShowModule === 'function') {
+      window.onShowModule('ladderRecommend', true);
+    }
+  } catch (e) {}
+  return 'ok';
+})()
+"""
+
 
 class CdpRecommendationSource(_CdpPageSource):
     """从盒子 CEF 页面读取推荐快照；断线自动重连。"""
@@ -395,6 +411,7 @@ class CdpRecommendationSource(_CdpPageSource):
     TARGET_HINTS = ("ladder-opp", "client-jipaiqi", "hs-web-embed")
     HOOK_JS = _RECOMMEND_HOOK
     READ_JS = _RECOMMEND_READ
+    ACTIVATE_JS = _RECOMMEND_ACTIVATE
     PANEL_ROUTE = "/client-jipaiqi/ladder-opp"
 
     def __init__(self, *args, **kwargs):
@@ -437,6 +454,22 @@ class CdpRecommendationSource(_CdpPageSource):
         except Exception as exc:
             self.last_error = f"panel_route_failed: {type(exc).__name__}: {exc}"
         super()._connect()
+        if self._cdp is not None:
+            try:
+                self._cdp.evaluate(self.ACTIVATE_JS, timeout=self.timeout)
+            except Exception:
+                pass
+
+    def _panel_notice(self) -> str:
+        try:
+            text = self._cdp.evaluate(
+                "(document.body&&document.body.innerText||'')"
+                ".replace(/\\s+/g,' ').slice(0,300)", timeout=self.timeout)
+        except Exception:
+            return "盒子尚未推送推荐"
+        if "阶梯开放" in str(text) or "AI推荐" in str(text):
+            return "盒子提示：AI推荐当前分段未开放"
+        return "盒子尚未推送推荐"
 
     def snapshot(self) -> Optional[RecommendationSnapshot]:
         data = self.read()
@@ -448,6 +481,13 @@ class CdpRecommendationSource(_CdpPageSource):
             return None
         payload = data.get("p")
         if version <= 0 or not isinstance(payload, dict):
+            # 页面刚导航完时 React 可能还没注册 onSwitchModule；这里再点一次
+            # 「推荐打法」标签，确保推荐组件挂载并接收后续推送。
+            try:
+                self._cdp.evaluate(self.ACTIVATE_JS, timeout=self.timeout)
+            except Exception:
+                pass
+            self.last_error = self._panel_notice()
             return None
         return RecommendationSnapshot(
             version=version, payload=payload, received_at=time.time())

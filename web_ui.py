@@ -755,6 +755,21 @@ def _box_player_sync_loop():
         time.sleep(20)
 
 
+def _warm_recommendation_hook():
+    """提前挂上盒子推荐 hook，避免开局推荐已推送、脚本 15s 后才连接而错过。"""
+    try:
+        from src.recommendation.cdp_source import CdpRecommendationSource
+        source = CdpRecommendationSource(timeout=1.0, retry_interval=2.0)
+    except Exception:
+        return
+    while True:
+        try:
+            source.snapshot()
+        except Exception:
+            pass
+        time.sleep(2)
+
+
 def _persist_schedule(start_dt, end_dt):
     cfg = load_config()
     cfg["schedule_start"] = (
@@ -3446,6 +3461,8 @@ def main():
     _boot_resume_schedule()
     # 启动即自检：Python 版本 / 依赖包 / 分辨率和缩放（结果进日志与页面）。
     start_selfcheck_async()
+    threading.Thread(target=_warm_recommendation_hook,
+                     name="hs-rec-warm", daemon=True).start()
 
     server = None
     port = None

@@ -6,7 +6,7 @@
 
 **原生单窗口 · 无 OCR · 读盒子 CEF / Power.log · 自动执行操作**
 
-当前版本：**1.3.19** ｜ 仅支持 **Windows 10/11 64 位**
+当前版本：**1.3.21** ｜ 仅支持 **Windows 10/11 64 位**
 
 </div>
 
@@ -78,12 +78,12 @@ HSAng 盒子（CDP 9222）───► 推荐 JSON、AI 胜率、传说名次、
 
 ## 快速开始（exe 单文件版）
 
-产物：`dist\HSArriver-Turbo.exe`（约 209 MB，内含 Python 3.12 和全部依赖）。
+产物：`dist\HSArriver-Turbo-1.3.21.exe`（约 209 MB，内含 Python 3.12 和全部依赖）。
 
 1. **先清理旧实例**：任务管理器（管理员）结束所有旧的 `pythonw.exe`，或重启一次。旧版本没有单实例保护，重复启动会留下多个后台进程。
-2. 双击 `HSArriver-Turbo.exe`。首次会解压到：
+2. 双击 `HSArriver-Turbo-1.3.21.exe`。首次会解压到：
    ```text
-   %LOCALAPPDATA%\HSArriverTurbo\runtime-1.3.19
+   %LOCALAPPDATA%\HSArriverTurbo\runtime-1.3.21
    ```
    约 524 MB，首次 1–3 分钟；之后几秒启动。
 3. 弹出 UAC 时点「是」。启动后只打开**一个原生窗口**，不是浏览器标签页。
@@ -237,10 +237,11 @@ python hsctl.py serve start       # 后台拉起控制台
 |---|---|
 | 双击后没有窗口 | 看 `app\log\console.log`；确认 WebView2 Runtime 存在。可先用 `python web_ui.py --no-browser` 验证后端 |
 | 提示已有实例但看不到窗口 | 旧实例可能没有原生窗口：管理员任务管理器结束所有 `pythonw.exe`，或重启 |
-| 仍有很多 `pythonw.exe` / 端口 8765–8770 | 旧版本没有单实例保护，是之前重复启动留下的；杀掉/重启后只用 1.3.19 |
+| 仍有很多 `pythonw.exe` / 端口 8765–8770 | 旧版本没有单实例保护，是之前重复启动留下的；杀掉/重启后只用 1.3.21 |
 | 点了没反应 | 没有管理员权限；用管理员 PowerShell 或计划任务启动 |
 | 盒子没有调试端口 | 运行 `python hsctl.py prepare` 或 `python hsctl.py box --restart`；对局中先打完 |
-| 换牌一直重试 / `recommendation_source_unavailable` | 1.3.19 会自动把盒子面板切到 `/ladder-opp`；45s 仍无推荐会直接确认保留全部；若还不动，手动打开盒子「推荐打法」面板或重启盒子 |
+| 盒子显示「推荐打法」但应用读不到 | 先看该页是否显示「AI推荐功能实行阶梯开放」：每月 01–10 日传说以下、11–20 日传说 5 万名外、21–月末传说 3 万名外才开放；不满足时盒子不会推送 JSON，应用会记 `盒子提示：AI推荐当前分段未开放` |
+| 换牌一直重试 / `recommendation_source_unavailable` | 1.3.21 启动时会提前挂推荐 hook、自动切到 `/ladder-opp` 并激活「推荐打法」页；45s 仍无推荐会直接确认保留全部 |
 | 一直提示 `turn_changed` | 盒子推荐还停在上一回合：等它刷新；把盒子「推荐打法」面板切到前台，或重启盒子 |
 | 账号不匹配 | 盒子登录的不是当前战网账号；在盒子里重新登录，约 20 秒自动更新 |
 | 一直提示「推荐暂不可执行」 | 看日志里的 `[推荐] 原文` JSON；把那段贴出来排查 |
@@ -265,11 +266,11 @@ python hsctl.py serve start       # 后台拉起控制台
 ## 从源码打包
 
 ```powershell
-# 版本号在 version.py；先改这里（例如 1.3.20），再运行：
+# 版本号在 version.py；先改这里（例如 1.3.22），再运行：
 powershell -ExecutionPolicy Bypass -File build\build-exe.ps1
 ```
 
-输出：`dist\HSArriver-Turbo.exe`、`dist\HSArriver-Turbo-<版本>.exe` 及对应 `.sha256`。
+输出：`dist\HSArriver-Turbo-<版本>.exe` 及对应 `.sha256`（只生成带版本号的文件）。
 版本号只维护 `version.py`：打包脚本读取它生成启动器版本，窗口标题、页面和浮窗也显示同一个版本。
 打包脚本会把 `.venv` 的 CPython、依赖和项目源码压进单文件 exe，首次运行解压到 `%LOCALAPPDATA%\HSArriverTurbo\runtime-<版本>`。
 

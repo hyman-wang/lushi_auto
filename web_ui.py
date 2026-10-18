@@ -5,7 +5,10 @@
 前端页面位于 web/index.html，启动后自动在浏览器打开。
 
 用法:
-    python web_ui.py [--no-browser]
+    python web_ui.py [--no-browser] [--new-instance]
+
+默认打开一个原生 WebView2 窗口；关闭窗口即退出整个进程。
+--no-browser 用于开发/测试，只起 HTTP 服务、不打开窗口。
 
 功能:
     * 用户 ID 自动从盒子首页读取（缓存到 ui_config.json）；页面只配置炉石日志目录
@@ -37,12 +40,15 @@ import sys
 import threading
 import time
 import traceback
+import urllib.request
 import webbrowser
 from collections import deque
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+import desktop_window
 
 # 脚本自己的日志文件：统计体积 / 打开位置 / 一键清理（纯函数在 script_logs.py）。
 import script_logs
@@ -3353,8 +3359,62 @@ def _boot_resume_schedule():
         _log("WARN", "上次保存的定时任务已过期，已自动取消，请在页面重新设置。")
 
 
+def _running_instance_url() -> str:
+    """返回已运行实例的 URL；端口文件过期或服务不可达时返回空串。"""
+    try:
+        info = json.loads(PORT_FILE.read_text(encoding="utf-8"))
+        url = str(info.get("url") or "").strip()
+        if not url:
+            return ""
+        with urllib.request.urlopen(url.rstrip("/") + "/api/status", timeout=1.5):
+            return url
+    except Exception:
+        return ""
+
+
+def _activate_existing_instance() -> bool:
+    """单实例：已有窗口就切到前台，然后让新进程直接退出。"""
+    if "--new-instance" in sys.argv or "--no-browser" in sys.argv:
+        return False
+    url = _running_instance_url()
+    if not url:
+        return False
+    if desktop_window.focus_existing_window():
+        print("HSLegendArriver 已在运行，已切换到已有窗口。")
+    else:
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "HSLegendArriver 已在运行，请在任务栏切换到已有窗口。",
+                desktop_window.TITLE,
+                0x40 | 0x10000,
+            )
+        except Exception:
+            pass
+    return True
+
+
+def _exit_after_window_close() -> None:
+    """窗口关闭：结束校准子进程、清理端口文件，然后退出整个进程。"""
+    global _CALIBRATION_PROC
+    try:
+        proc = _CALIBRATION_PROC
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+    except Exception:
+        pass
+    _clear_port_file()
+    try:
+        _log("SYS", "窗口已关闭，退出控制台。")
+    except Exception:
+        pass
+    os._exit(0)
+
+
 def main():
     os.chdir(ROOT)
+    if _activate_existing_instance():
+        return
     # DPI 感知必须最先声明：未声明时 Windows 会把客户区几何按系统缩放虚拟化
     # （150% 下 1920×1080 报成 1280×720），而抓图是物理像素 —— 两者对不上会
     # 让所有 ROI 错位、界面识别失败。见 display_mapping 模块 docstring。
@@ -3401,14 +3461,17 @@ def main():
 
     url = f"http://{HOST}:{port}"
     print("=" * 64)
-    print("  HSLegendArriver Web 控制台")
-    print(f"  请在浏览器中打开: {url}")
+    print("  HSLegendArriver 控制台")
+    print(f"  窗口地址: {url}")
     if not IS_ADMIN:
         print("  [!] 当前不是管理员权限，自动化鼠标/键盘操作可能失效，")
     print("      建议以管理员身份重新运行本程序。")
-    print("  按 Ctrl+C 或直接关闭窗口即可退出控制台。")
+    print("  关闭窗口即可退出；开发模式按 Ctrl+C 退出。")
     print("=" * 64)
     if "--no-browser" not in sys.argv:
+        if desktop_window.run(url):
+            _exit_after_window_close()
+        # WebView2 不可用时退回浏览器，至少页面仍能打开。
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         while True:

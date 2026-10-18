@@ -80,6 +80,10 @@ body{
 .field-hint.ok{color:var(--green)}
 .field-hint.bad{color:var(--red)}
 input[type=text],input[type=datetime-local],input[type=number],select{width:100%;height:36px;box-sizing:border-box;background:#0f0b07;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:0 10px;font-size:13px;transition:border-color .15s,box-shadow .15s}
+input[type=text]{max-width:420px}
+input[type=datetime-local]{max-width:230px}
+input[type=number]{max-width:120px}
+select{max-width:180px}
 input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,185,59,.14)}
 input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 input[type=checkbox]{width:18px;height:18px;accent-color:#e8b93b;cursor:pointer}
@@ -103,13 +107,12 @@ body.hide-desc .card.show-desc .hint-line.desc,body.hide-desc .card.show-desc .f
 .btn-warn:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 4px 16px rgba(226,168,78,.3)}
 .btn-ghost{background:transparent;color:var(--muted);border-color:var(--border)}
 .btn-ghost:hover:not(:disabled){color:var(--text);border-color:var(--gold)}
-.btn-big{height:42px;padding:0 18px;font-size:14px}
+.btn-big{height:40px;padding:0 16px;font-size:13.5px}
 .btn-small{height:28px;padding:0 10px;font-size:12px}
 .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
-.btn-row .btn{flex:1 1 0;min-width:0}
-.btn-row.big{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
-.btn-row.big #btnStart{grid-column:1 / -1}
-.btn-row.big .btn{width:100%;padding:0 8px;font-size:12.5px}
+.btn-row .btn{flex:none}
+.btn-row.big{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn-row.big .btn{flex:none}
 /* ---------- 芯片 / 倒计时 ---------- */
 .chip{display:inline-block;padding:6px 13px;border-radius:999px;font-size:13px;background:rgba(95,168,230,.1);color:#9cc8ea;border:1px solid rgba(95,168,230,.3)}
 .chip.amber{background:rgba(226,168,78,.1);color:#eec07a;border-color:rgba(226,168,78,.32)}
@@ -368,7 +371,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="hint-line" id="rankStopStatus" style="margin-top:4px;color:var(--text)">段位目标：等待自动化运行…</div>
     </section>
 
-    <section class="card">
+    <section class="card wide">
       <h2 class="card-title">🎭 活人感（可选）</h2>
       <div class="input-row">
         <label class="field" style="flex:none;min-width:90px">

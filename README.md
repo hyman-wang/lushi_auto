@@ -6,7 +6,7 @@
 
 **原生单窗口 · 无 OCR · 读盒子 CEF / Power.log · 自动执行操作**
 
-当前版本：**1.3.16** ｜ 仅支持 **Windows 10/11 64 位**
+当前版本：**1.3.17** ｜ 仅支持 **Windows 10/11 64 位**
 
 </div>
 
@@ -83,7 +83,7 @@ HSAng 盒子（CDP 9222）───► 推荐 JSON、AI 胜率、传说名次、
 1. **先清理旧实例**：任务管理器（管理员）结束所有旧的 `pythonw.exe`，或重启一次。旧版本没有单实例保护，重复启动会留下多个后台进程。
 2. 双击 `HSArriver-Turbo.exe`。首次会解压到：
    ```text
-   %LOCALAPPDATA%\HSArriverTurbo\runtime-1.3.16
+   %LOCALAPPDATA%\HSArriverTurbo\runtime-1.3.17
    ```
    约 524 MB，首次 1–3 分钟；之后几秒启动。
 3. 弹出 UAC 时点「是」。启动后只打开**一个原生窗口**，不是浏览器标签页。
@@ -237,9 +237,11 @@ python hsctl.py serve start       # 后台拉起控制台
 |---|---|
 | 双击后没有窗口 | 看 `app\log\console.log`；确认 WebView2 Runtime 存在。可先用 `python web_ui.py --no-browser` 验证后端 |
 | 提示已有实例但看不到窗口 | 旧实例可能没有原生窗口：管理员任务管理器结束所有 `pythonw.exe`，或重启 |
-| 仍有很多 `pythonw.exe` / 端口 8765–8770 | 旧版本没有单实例保护，是之前重复启动留下的；杀掉/重启后只用 1.3.16 |
+| 仍有很多 `pythonw.exe` / 端口 8765–8770 | 旧版本没有单实例保护，是之前重复启动留下的；杀掉/重启后只用 1.3.17 |
 | 点了没反应 | 没有管理员权限；用管理员 PowerShell 或计划任务启动 |
 | 盒子没有调试端口 | 运行 `python hsctl.py prepare` 或 `python hsctl.py box --restart`；对局中先打完 |
+| 换牌一直重试 / `recommendation_source_unavailable` | 1.3.17 会自动把盒子面板切到 `/ladder-opp`；若仍不动，手动打开盒子「推荐打法」面板，或重启盒子 |
+| 一直提示 `turn_changed` | 盒子推荐还停在上一回合：等它刷新；把盒子「推荐打法」面板切到前台，或重启盒子 |
 | 账号不匹配 | 盒子登录的不是当前战网账号；在盒子里重新登录，约 20 秒自动更新 |
 | 一直提示「推荐暂不可执行」 | 看日志里的 `[推荐] 原文` JSON；把那段贴出来排查 |
 | 日志目录不存在 | 「基础配置」里点「检测」，或 `hsctl config set --log-root ...` |
@@ -263,7 +265,7 @@ python hsctl.py serve start       # 后台拉起控制台
 ## 从源码打包
 
 ```powershell
-# 先改 build\launcher\Launcher.cs 里的 Version（例如 1.3.17）
+# 先改 build\launcher\Launcher.cs 里的 Version（例如 1.3.18）
 powershell -ExecutionPolicy Bypass -File build\build-exe.ps1
 ```
 

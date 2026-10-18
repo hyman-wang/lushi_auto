@@ -38,6 +38,7 @@ from collections import deque
 # 脚本日志（对战日志 / 运行日志）的体积、命名与清理都在 script_logs.py 里；
 # 浮窗只用它的 format_size 与 new_battle_log_path，避免两份实现打架。
 import script_logs
+from version import __version__
 
 _LOCK = threading.Lock()
 _LINES: deque = deque(maxlen=2000)
@@ -155,7 +156,7 @@ LOG_DANGER_BYTES = 500 * 1024 * 1024
 
 # 浮窗顶部品牌行：本项目大名（放在“自动化日志”标题之前）。
 # 副标题「炉石传说 · 自动对战」已按用户要求删除。
-BRAND_NAME = "HSLegendArriver"
+BRAND_NAME = f"HSLegendArriver v{__version__}"
 # 状态圆点：功能开着 = 绿，关着 = 红，状态未知 = 灰。
 MARKER_ON = GREEN
 MARKER_OFF = DANGER

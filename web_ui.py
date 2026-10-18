@@ -49,6 +49,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import desktop_window
+from version import __version__ as APP_VERSION
 
 # 脚本自己的日志文件：统计体积 / 打开位置 / 一键清理（纯函数在 script_logs.py）。
 import script_logs
@@ -3058,6 +3059,7 @@ def status_snapshot():
         overlay_running = False
     return {
         "server_time": datetime.now().isoformat(timespec="seconds"),
+        "version": APP_VERSION,
         "is_admin": IS_ADMIN,
         "running": running,
         "starting": starting,
@@ -3458,6 +3460,7 @@ def main():
         sys.exit(1)
     threading.Thread(target=server.serve_forever, name="hs-web", daemon=True).start()
     _write_port_file(port)
+    _log("SYS", f"HSArriver-Turbo v{APP_VERSION} 已启动。")
 
     url = f"http://{HOST}:{port}"
     print("=" * 64)

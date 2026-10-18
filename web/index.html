@@ -39,6 +39,7 @@ body{
 .logo{display:flex;align-items:center;gap:8px}
 .logo-icon{font-size:24px;filter:drop-shadow(0 3px 10px rgba(232,185,59,.4))}
 .logo h1{font-family:Georgia,"Songti SC","SimSun",serif;font-size:19px;letter-spacing:1px;background:linear-gradient(90deg,#f7d97e,#d9a62e);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo .version{font-family:Consolas,monospace;font-size:11px;letter-spacing:0;color:var(--muted);margin-left:4px;background:none;-webkit-text-fill-color:var(--muted)}
 .logo p{display:none}
 .header-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .header-stats b{color:var(--gold-bright);font-size:13px;margin-left:2px}
@@ -176,7 +177,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
     <div class="logo">
       <div class="logo-icon">🏆</div>
       <div>
-        <h1>HSLegendArriver</h1>
+        <h1>HSLegendArriver <span id="appVersion" class="version">v--</span></h1>
       </div>
     </div>
     <div class="header-stats">
@@ -619,6 +620,10 @@ function renderBanners(s){
 
 function render(s){
   lastStatus = s;
+  if (s.version){
+    $("appVersion").textContent = "v" + s.version;
+    document.title = "HSLegendArriver v" + s.version + " · 自动对战控制台";
+  }
   var running = s.phase === "playing" || s.phase === "stopping";
   var busy = running || s.starting;
   var info = PHASE_INFO[s.phase] || PHASE_INFO.idle;

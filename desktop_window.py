@@ -9,7 +9,9 @@ from __future__ import annotations
 import ctypes
 import traceback
 
-TITLE = "HSLegendArriver"
+from version import __version__
+
+TITLE = f"HSLegendArriver v{__version__}"
 
 
 def focus_existing_window() -> bool:

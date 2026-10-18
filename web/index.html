@@ -58,31 +58,36 @@ body{
 .pill.finished .dot{background:#7fb98a}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(99,199,111,.55)}70%{box-shadow:0 0 0 8px rgba(99,199,111,0)}100%{box-shadow:0 0 0 0 rgba(99,199,111,0)}}
 /* ---------- 布局 ---------- */
-.container{max-width:1180px;margin:0 auto;padding:26px 20px 70px}
-.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-.card{background:linear-gradient(180deg,var(--panel),#120d08);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.container{max-width:1420px;margin:0 auto;padding:18px 16px 50px}
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+.card{background:linear-gradient(180deg,var(--panel),#120d08);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
 .card.wide{grid-column:1 / -1}
-.card-title{font-size:15px;font-weight:700;letter-spacing:.5px;color:var(--gold-bright);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-@media (max-width:900px){.main-grid{grid-template-columns:1fr}.card.wide{grid-column:auto}}
+.card-title{font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--gold-bright);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+@media (max-width:980px){.main-grid{grid-template-columns:1fr}.card.wide{grid-column:auto}}
 /* ---------- 统计 ---------- */
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.stat{background:var(--panel2);border:1px solid var(--border-soft);border-radius:12px;padding:14px 8px;text-align:center}
-.stat-value{font-size:26px;font-weight:800;color:var(--gold-bright);font-family:Georgia,serif;word-break:break-all}
-.stat-label{font-size:12px;color:var(--muted);margin-top:4px}
-.subrow{margin-top:12px;font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:var(--panel2);border:1px solid var(--border-soft);border-radius:12px;padding:10px 8px;text-align:center}
+.stat-value{font-size:24px;font-weight:800;color:var(--gold-bright);font-family:Georgia,serif;word-break:break-all}
+.stat-label{font-size:12px;color:var(--muted);margin-top:3px}
+.subrow{margin-top:10px;font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 @media (max-width:560px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
 /* ---------- 表单 ---------- */
-.field{display:block;margin-bottom:14px}
-.field-label{display:block;font-size:13px;color:var(--text);margin-bottom:6px;font-weight:600}
-.field-hint{display:block;font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+.field{display:block;margin-bottom:10px}
+.field-label{display:block;font-size:13px;color:var(--text);margin-bottom:5px;font-weight:600}
+.field-hint{display:block;font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5}
 .field-hint.ok{color:var(--green)}
 .field-hint.bad{color:var(--red)}
-input[type=text],input[type=datetime-local],input[type=number],select{width:100%;background:#0f0b07;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;font-size:14px;transition:border-color .15s,box-shadow .15s}
+input[type=text],input[type=datetime-local],input[type=number],select{width:100%;background:#0f0b07;border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:14px;transition:border-color .15s,box-shadow .15s}
 input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,185,59,.14)}
 input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
 .input-row{display:flex;gap:8px}
 .input-row input,.input-row select{flex:1}
-.hint-line{margin-top:12px;font-size:12px;color:var(--muted);line-height:1.6}
+.hint-line{margin-top:8px;font-size:12px;color:var(--muted);line-height:1.6}
+/* ---------- 说明折叠：默认隐藏，按钮/每卡片 ⓘ 展开 ---------- */
+body.hide-desc .hint-line.desc,body.hide-desc .field-hint.desc{display:none}
+body.hide-desc .card.show-desc .hint-line.desc,body.hide-desc .card.show-desc .field-hint.desc{display:block}
+.desc-btn{font-size:11px;padding:2px 8px;border:1px solid var(--border-soft);border-radius:8px;color:var(--muted);background:transparent;cursor:pointer}
+.desc-btn:hover{color:var(--gold-bright);border-color:var(--gold)}
 /* ---------- 按钮 ---------- */
 .btn{border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s;color:var(--text);background:transparent}
 .btn:disabled{opacity:.35;cursor:not-allowed;filter:none;transform:none;box-shadow:none}
@@ -143,7 +148,7 @@ a{color:var(--gold-bright);text-decoration:none;border-bottom:1px dashed rgba(24
 a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
 </style>
 </head>
-<body>
+<body class="hide-desc">
 
 <header class="header">
   <div class="header-inner">
@@ -155,6 +160,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       </div>
     </div>
     <div class="header-right">
+      <button id="btnToggleDesc" class="btn btn-ghost btn-small" type="button">📝 显示说明</button>
       <div id="statusPill" class="pill idle"><span class="dot"></span><span id="pillText">空闲</span></div>
       <div id="clock" class="clock">--:--:--</div>
     </div>
@@ -165,7 +171,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
 <div class="repo-bar">
   <div class="repo-bar-inner">
     <span class="repo-bar-label">📦 本开源项目地址：</span>
-    <a class="repo-link" href="https://github.com/magicstrangelzb/HearthstoneLegendArriver" target="_blank" rel="noopener noreferrer">github.com/magicstrangelzb/HearthstoneLegendArriver</a>
+    <a class="repo-link" href="https://github.com/hyman-wang/lushi_auto" target="_blank" rel="noopener noreferrer">github.com/hyman-wang/lushi_auto</a>
     <span class="repo-bar-note">（GPL-3.0 · 完全免费开源，仅用于技术研究与代码交流；觉得有用欢迎点个 ⭐）</span>
   </div>
 </div>
@@ -190,7 +196,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       </div>
     </section>
 
-    <section class="card wide" id="cardSelfcheck">
+    <section class="card" id="cardSelfcheck">
       <h2 class="card-title">
         <span>🧪 环境自检</span>
         <span style="display:flex;gap:10px;align-items:center">
@@ -253,7 +259,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="hint-line">🪄 点 <b>「开始运行」</b>只会打开日志浮窗、把炉石切到前台，<b>不会自动开打</b>；就绪后按钮变为 <b>「开始对战」</b>，再点一次（二次确认后）才真正开始。<br>⌨️ 快捷键 Ctrl+Q 可随时立即停止自动化；请保持炉石与炉石盒子前台可见、分辨率 1920×1080。<br>🖥️ 炉石请使用 <b>全屏模式</b>（<code>设置 → 选项 → 显示 → 全屏</code>），<b>不要用「最大化窗口」</b>：最大化时窗口坐标与 1920×1080 全屏不一致，硬编码的点击坐标会整体偏移——下随从因有吸附还能成功，法术指定目标则会一直失败重试。<br>♻ 浮窗上的 <b>「重启炉石」</b>会先弹确认，再执行「停自动化 → 强制结束 Hearthstone.exe → 清空日志目录（保留 Log.config）→ 重新启动炉石」，用于<b>日志状态和游戏对不上</b>（没在游戏却显示在换牌）的情况；重启会<b>优先走战网</b>（战网没开就先开战网，再点「开始游戏」），而且以<b>游戏窗口出现</b>才算成功，不会出现“报已启动、其实炉石已经关了”；<b>「退出浮窗」</b>只关窗口、脚本继续跑；关掉浮窗会回到<b>未就绪</b>状态（大按钮变回「🪄 开始运行（准备）」），再点上面的「🪟 日志浮窗」或「开始运行」把浮窗开出来，然后点「⚔️ 开始对战」才会开始。</div>
     </section>
 
-    <section class="card wide">
+    <section class="card">
       <h2 class="card-title">🩺 存活检测（挂机防空转）</h2>
       <div class="input-row">
         <label class="field" style="flex:none;min-width:90px">
@@ -276,7 +282,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="hint-line" id="livenessStatus" style="margin-top:4px;color:var(--text)">存活状态：等待检测…</div>
     </section>
 
-    <section class="card wide">
+    <section class="card">
       <h2 class="card-title">🔄 中断重启（卡住自动重开）</h2>
       <div class="input-row">
         <label class="field" style="flex:none;min-width:90px">
@@ -299,7 +305,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="hint-line" id="watchdogStatus" style="margin-top:4px;color:var(--text)">中断重启：等待检测…</div>
     </section>
 
-    <section class="card wide">
+    <section class="card">
       <h2 class="card-title">🏳️ 自动投降</h2>
       <div class="input-row">
         <label class="field" style="flex:none;min-width:90px">
@@ -322,7 +328,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="hint-line" id="concedeDetect" style="margin-top:4px;color:var(--text)">检测状态：等待自动化运行…</div>
     </section>
 
-    <section class="card wide">
+    <section class="card">
       <h2 class="card-title">🏁 段位目标（可选）</h2>
       <div class="input-row">
         <label class="field" style="flex:none;min-width:150px">
@@ -355,7 +361,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="hint-line" id="rankStopStatus" style="margin-top:4px;color:var(--text)">段位目标：等待自动化运行…</div>
     </section>
 
-    <section class="card wide">
+    <section class="card">
       <h2 class="card-title">🎭 活人感（可选）</h2>
       <div class="input-row">
         <label class="field" style="flex:none;min-width:90px">
@@ -479,7 +485,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
 
   </div>
 
-  <div class="footer">HSLegendArriver · 仅用于技术研究与代码交流 · <a href="https://github.com/magicstrangelzb/HearthstoneLegendArriver" target="_blank" rel="noopener noreferrer">github.com/magicstrangelzb/HearthstoneLegendArriver</a></div>
+  <div class="footer">HSLegendArriver · 仅用于技术研究与代码交流 · <a href="https://github.com/hyman-wang/lushi_auto" target="_blank" rel="noopener noreferrer">github.com/hyman-wang/lushi_auto</a></div>
 </div>
 
 <div id="toasts"></div>
@@ -1026,35 +1032,49 @@ function renderSelfcheck(res){
   var badge = $("selfcheckBadge");
   badge.textContent = res.ok ? "✅ 自检通过" : "❌ " + res.failed + " 项待修";
   badge.className = "chip" + (res.ok ? "" : " amber");
-  /* 有 ❌ 时自动展开（不然问题被收起来看不见）；这不算用户偏好，不写进本地记录 */
-  if (!res.ok) setSelfcheckCollapsed(false, false);
+  /* 有 ❌ 时自动展开；通过时默认折叠，只留一行徽标。用户手动展开后本轮不再强制折叠。 */
+  var isOk = !!res.ok;
+  if (selfcheckLastOk !== null && selfcheckLastOk !== isOk) {
+    selfcheckUserToggled = false;
+  }
+  selfcheckLastOk = isOk;
+  if (!isOk) {
+    setSelfcheckCollapsed(false, false);
+  } else if (!selfcheckUserToggled) {
+    setSelfcheckCollapsed(true, false);
+  }
 }
 
-/* ---------- 环境自检：可收起（选择记在浏览器本地） ---------- */
+/* ---------- 环境自检：可收起（通过时默认折叠） ---------- */
 var SELFCHECK_COLLAPSED_KEY = "hsSelfcheckCollapsed";
+var selfcheckUserToggled = false;
+var selfcheckLastOk = null;
 
 function setSelfcheckCollapsed(collapsed, remember){
   var body = $("selfcheckBody"), btn = $("btnSelfcheckToggle");
   if (!body || !btn) return;
   body.style.display = collapsed ? "none" : "";
+  var summary = $("selfcheckSummary");
+  if (summary) summary.style.display = collapsed ? "none" : "";
   btn.textContent = collapsed ? "展开" : "收起";
   if (remember === false) return;
   try { localStorage.setItem(SELFCHECK_COLLAPSED_KEY, collapsed ? "1" : "0"); } catch(e){}
 }
 
 function initSelfcheckCollapse(){
-  var saved = null;
-  try { saved = localStorage.getItem(SELFCHECK_COLLAPSED_KEY); } catch(e){}
-  setSelfcheckCollapsed(saved === "1", false);   /* 默认展开 */
+  /* 默认折叠；自检通过时页面只剩 ✅ 徽标，出问题会自动展开。 */
+  setSelfcheckCollapsed(true, false);
 }
 
 $("btnSelfcheckToggle").addEventListener("click", function(){
+  selfcheckUserToggled = true;
   setSelfcheckCollapsed($("selfcheckBody").style.display !== "none");
 });
 initSelfcheckCollapse();
 
 $("btnSelfcheck").addEventListener("click", function(){
   var btn = $("btnSelfcheck");
+  selfcheckUserToggled = false;
   btn.disabled = true; btn.textContent = "自检中…";
   $("selfcheckSummary").textContent = "正在自检：要按顺序 import 一遍依赖，约几秒…";
   post("/api/selfcheck", {}).then(function(r){
@@ -1264,6 +1284,47 @@ $("btnSaveDelays").addEventListener("click", function(){
     }
   });
 });
+
+/* ---------- 描述折叠：默认收起，按钮/每卡片 ⓘ 展开 ---------- */
+(function initDescCollapse(){
+  var KEEP_IDS = {
+    selfcheckSummary: 1, nameMatch: 1, livenessStatus: 1,
+    watchdogStatus: 1, concedeDetect: 1, rankStopStatus: 1,
+    delayHint: 1, logHint: 1
+  };
+  document.querySelectorAll(".hint-line, .field-hint").forEach(function(el){
+    if (el.id && KEEP_IDS[el.id]) return;
+    el.classList.add("desc");
+  });
+  document.querySelectorAll(".main-grid .card").forEach(function(card){
+    if (card.id === "cardSelfcheck") return;
+    if (!card.querySelector(".desc")) return;
+    var title = card.querySelector(".card-title");
+    if (!title) return;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "desc-btn";
+    btn.textContent = "ⓘ 说明";
+    btn.title = "显示/隐藏本卡片说明";
+    btn.addEventListener("click", function(){ card.classList.toggle("show-desc"); });
+    title.appendChild(btn);
+  });
+  var hidden = true;
+  try { if (localStorage.getItem("hsHideDesc") === "0") hidden = false; } catch(e){}
+  var toggle = document.getElementById("btnToggleDesc");
+  function apply(){
+    document.body.classList.toggle("hide-desc", hidden);
+    if (toggle) toggle.textContent = hidden ? "📝 显示说明" : "📝 隐藏说明";
+  }
+  if (toggle){
+    toggle.addEventListener("click", function(){
+      hidden = !hidden;
+      try { localStorage.setItem("hsHideDesc", hidden ? "1" : "0"); } catch(e){}
+      apply();
+    });
+  }
+  apply();
+})();
 
 /* ---------- 启动 ---------- */
 refreshStatus();

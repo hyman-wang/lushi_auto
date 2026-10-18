@@ -229,6 +229,17 @@ class SelfcheckPageTests(unittest.TestCase):
         self.assertIn("环境自检发现", self.html)
         self.assertIn("pip install -r requirements.txt", self.html)
 
+    def test_selfcheck_collapses_when_it_passes(self):
+        self.assertIn("selfcheckUserToggled", self.html)
+        self.assertIn("setSelfcheckCollapsed(true, false)", self.html)
+
+    def test_project_url_is_the_owner_repo(self):
+        self.assertIn("github.com/hyman-wang/lushi_auto", self.html)
+
+    def test_descriptions_can_be_collapsed(self):
+        self.assertIn('id="btnToggleDesc"', self.html)
+        self.assertIn("hide-desc", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()

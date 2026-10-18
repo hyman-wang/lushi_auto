@@ -3,6 +3,7 @@
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from src.recommendation.cdp_source import CdpError, CdpRecommendationSource
 
@@ -47,6 +48,39 @@ class PickTargetTests(unittest.TestCase):
     def test_no_page_raises(self):
         with self.assertRaises(CdpError):
             self.source._pick_target([])
+
+
+class RecommendationRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.source = CdpRecommendationSource()
+
+    def test_analysis_page_is_rewritten_to_ladder_opp(self):
+        self.assertEqual(
+            "https://hs-web-embed.lushi.163.com/client-jipaiqi/ladder-opp",
+            self.source._recommendation_url(
+                "https://hs-web-embed.lushi.163.com/client-jipaiqi/analysis"))
+
+    def test_ladder_opp_page_is_left_alone(self):
+        self.assertIsNone(self.source._recommendation_url(
+            "https://hs-web-embed.lushi.163.com/client-jipaiqi/ladder-opp"))
+
+    def test_unrelated_pages_are_not_rewritten(self):
+        self.assertIsNone(self.source._recommendation_url(
+            "https://hs-web-match.lushi.163.com/client-battle/"))
+
+    def test_switch_navigates_the_panel_to_ladder_opp(self):
+        fake = MagicMock()
+        page = target(
+            "https://hs-web-embed.lushi.163.com/client-jipaiqi/analysis")
+        with patch("src.recommendation.cdp_source._Cdp", return_value=fake):
+            self.source._switch_panel_to_recommendation(page)
+
+        fake.call.assert_any_call(
+            "Page.navigate",
+            {"url": "https://hs-web-embed.lushi.163.com/client-jipaiqi/ladder-opp"},
+            timeout=self.source.timeout,
+        )
+        fake.close.assert_called_once()
 
 
 class TargetSwitchTests(unittest.TestCase):

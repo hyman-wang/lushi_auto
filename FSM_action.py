@@ -157,7 +157,10 @@ def initialize_recommendation_automation():
         # 换牌建议同样来自盒子推送（actionName == "replace"）。
         snapshot = recommendation_source.snapshot()
         if snapshot is None:
-            raise RuntimeError("recommendation_source_unavailable")
+            target = getattr(recommendation_source, "target_url", None) or "no-target"
+            detail = getattr(recommendation_source, "last_error", None) or "no-data"
+            raise RuntimeError(
+                f"recommendation_source_unavailable（{target}；{detail}）")
         action = payload_to_action(
             snapshot.payload,
             turn_number=log_state.game_num_turns_in_play,
@@ -1621,9 +1624,9 @@ def run_automatic_battle_step():
         _do_concede()
         # 认输后不立即返回结算，等上面 is_end 分支（日志 COMPLETE）再计数。
         return None
-    _report_automation_diagnostic("my_turn", "轮到己方操作：开始读取推荐……")
     turn = snapshot.game_num_turns_in_play
     if player_turn_delay_key != turn:
+        _report_automation_diagnostic("my_turn", "轮到己方操作：开始读取推荐……")
         # 每个新回合开始只延时一次（给盒子更新推荐留时间），
         # 同回合内的多次出牌操作之间不重复延时。
         player_turn_delay_key = turn
@@ -1652,12 +1655,21 @@ def run_automatic_battle_step():
         _ocr_fail_streak += 1
         if result.diagnostics == "discover_choice_still_open":
             message = "发现选择仍在，准备重新点击。"
+        elif result.diagnostics == "turn_changed" and _ocr_fail_streak >= 5:
+            message = ("盒子推荐还停在上一回合，等待盒子刷新；"
+                       "若一直不动，请把盒子「推荐打法」面板切到前台。")
         else:
             message = (
                 "当前推荐暂不可执行，继续重试："
                 f"{result.diagnostics}")
         _report_automation_diagnostic(
-            f"retry:{result.diagnostics}", message)
+            "retry:turn_changed_stale"
+            if result.diagnostics == "turn_changed" and _ocr_fail_streak >= 5
+            else f"retry:{result.diagnostics}",
+            message)
+        if result.diagnostics == "turn_changed":
+            # 防止 turn_changed 在同一回合内空转刷屏；给盒子一个推送窗口。
+            time.sleep(0.5)
     elif result.status == FlowStepStatus.OBSERVE:
         observe_messages = {
             "opponent_turn": "等待对手操作。",

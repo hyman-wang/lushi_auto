@@ -25,6 +25,7 @@ import time
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9222
@@ -394,6 +395,48 @@ class CdpRecommendationSource(_CdpPageSource):
     TARGET_HINTS = ("ladder-opp", "client-jipaiqi", "hs-web-embed")
     HOOK_JS = _RECOMMEND_HOOK
     READ_JS = _RECOMMEND_READ
+    PANEL_ROUTE = "/client-jipaiqi/ladder-opp"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._last_route_switch = 0.0
+
+    def _recommendation_url(self, url: str) -> Optional[str]:
+        """盒子新版把面板做成 SPA：analysis 页切到 /ladder-opp 才有推荐函数。"""
+        if not url or "ladder-opp" in url or "client-jipaiqi" not in url:
+            return None
+        parts = urlsplit(url)
+        marker = "/client-jipaiqi/"
+        if marker not in parts.path:
+            return None
+        prefix = parts.path.split(marker, 1)[0]
+        return urlunsplit((parts.scheme, parts.netloc,
+                           prefix + self.PANEL_ROUTE, "", ""))
+
+    def _switch_panel_to_recommendation(self, target: dict) -> None:
+        new_url = self._recommendation_url(str(target.get("url") or ""))
+        if not new_url:
+            return
+        now = time.time()
+        if now - self._last_route_switch < 5.0:
+            return
+        self._last_route_switch = now
+        cdp = _Cdp(target["webSocketDebuggerUrl"], timeout=self.timeout)
+        try:
+            cdp.call("Page.enable", timeout=self.timeout)
+            cdp.call("Page.navigate", {"url": new_url}, timeout=self.timeout)
+        finally:
+            cdp.close()
+        # 等新路由把 window.onUpdateLadderActionRecommend 注册上。
+        time.sleep(0.6)
+
+    def _connect(self) -> None:
+        target = self._pick_target(self._targets())
+        try:
+            self._switch_panel_to_recommendation(target)
+        except Exception as exc:
+            self.last_error = f"panel_route_failed: {type(exc).__name__}: {exc}"
+        super()._connect()
 
     def snapshot(self) -> Optional[RecommendationSnapshot]:
         data = self.read()

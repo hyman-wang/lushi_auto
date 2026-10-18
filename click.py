@@ -2,6 +2,7 @@ import win32gui
 import win32api
 import win32con
 import pywintypes
+import math
 import time
 from pynput.mouse import Button, Controller
 import random
@@ -258,6 +259,79 @@ def _send_physical_click(mouse, x, y, button):
     mouse.release(button)
 
 
+def _bezier_track(start, end, rng=random):
+    """Return cursor points along a deliberately imperfect cubic Bezier.
+
+    A real finger drag is never a perfectly straight line: it bows to one
+    side, corrects, and carries a little tremor. We bend a cubic Bezier to
+    one side with randomized control points and add a low-frequency lateral
+    wobble, while forcing the last point to be exactly ``end`` so the drop
+    coordinate stays correct.
+    """
+    x0, y0 = float(start[0]), float(start[1])
+    x1, y1 = float(end[0]), float(end[1])
+    dx, dy = x1 - x0, y1 - y0
+    distance = math.hypot(dx, dy)
+    if distance < 3.0:
+        return [(int(round(x1)), int(round(y1)))]
+
+    # Unit normal: bend the straight line sideways by a fraction of its length.
+    nx, ny = -dy / distance, dx / distance
+    side = -1.0 if rng.random() < 0.5 else 1.0
+    bend1 = side * distance * rng.uniform(0.035, 0.085)
+    bend2 = side * distance * rng.uniform(0.010, 0.040)
+    c1 = (x0 + dx * 0.32 + nx * bend1, y0 + dy * 0.32 + ny * bend1)
+    c2 = (x0 + dx * 0.68 + nx * bend2, y0 + dy * 0.68 + ny * bend2)
+
+    steps = max(8, min(30, int(distance / 20)))
+    phase = rng.uniform(0.0, 2.0 * math.pi)
+    wobble_cycles = rng.uniform(1.2, 2.4)
+    wobble_pixels = rng.uniform(0.5, 1.6)
+
+    points = []
+    for index in range(1, steps + 1):
+        t = index / steps
+        u = 1.0 - t
+        bx = (u * u * u * x0 + 3.0 * u * u * t * c1[0]
+              + 3.0 * u * t * t * c2[0] + t * t * t * x1)
+        by = (u * u * u * y0 + 3.0 * u * u * t * c1[1]
+              + 3.0 * u * t * t * c2[1] + t * t * t * y1)
+        # Taper the tremor to zero at both ends: no drift on press/release.
+        taper = math.sin(math.pi * t)
+        lateral = (math.sin(2.0 * math.pi * wobble_cycles * t + phase)
+                   * wobble_pixels * taper)
+        points.append((int(round(bx + nx * lateral)),
+                       int(round(by + ny * lateral))))
+
+    points[-1] = (int(round(x1)), int(round(y1)))
+    return points
+
+
+def _slide_mouse(mouse, start, end, rng=random):
+    """Move the cursor from ``start`` to ``end`` along a Bezier track."""
+    points = _bezier_track(start, end, rng=rng)
+    distance = math.hypot(end[0] - start[0], end[1] - start[1])
+    # Roughly 0.18-0.60 s for a drag; longer swipes take a little longer.
+    duration = min(0.60, max(0.18, distance / 2200.0
+                              * rng.uniform(0.85, 1.15)))
+    step_delay = duration / max(1, len(points))
+    for point in points:
+        mouse.position = point
+        rand_sleep(step_delay)
+
+
+def _bezier_drag(mouse, start, end, hold_seconds=0.1, rng=random):
+    """Press, slide along a Bezier track, hold, then release."""
+    mouse.position = (int(round(start[0])), int(round(start[1])))
+    rand_sleep(0.06)
+    mouse.press(Button.left)
+    try:
+        _slide_mouse(mouse, start, end, rng=rng)
+        rand_sleep(hold_seconds)
+    finally:
+        mouse.release(Button.left)
+
+
 def click_button(x, y, button, require_hearthstone=True):
     """在**屏幕坐标** (x, y) 上按下/松开按钮。
 
@@ -425,15 +499,10 @@ def drag_card_to_board_entity(card_index, card_num, entity_index, entity_num):
 
     mouse = Controller()
     mapping = _display_mapping()
-    mouse.position = _to_screen(HAND_CARD_X[card_num][card_index], 1000, mapping)
-    rand_sleep(0.1)
-    mouse.press(Button.left)
-    try:
-        board_x = 960 - (entity_num - 1) * 70 + entity_index * 140
-        mouse.position = _to_screen(board_x - 25, 600, mapping)
-        rand_sleep(0.1)
-    finally:
-        mouse.release(Button.left)
+    start = _to_screen(HAND_CARD_X[card_num][card_index], 1000, mapping)
+    board_x = 960 - (entity_num - 1) * 70 + entity_index * 140
+    end = _to_screen(board_x - 25, 600, mapping)
+    _bezier_drag(mouse, start, end, hold_seconds=0.1)
 
 
 # 第[i]个随从左边那个空隙记为第[i]个gap
@@ -531,16 +600,14 @@ def drag_card_to_deck():
 
     到达牌库后必须按够 DECK_DROP_HOLD_INTERVAL 再松手：交易/锻造/预备都靠
     “牌库悬停高亮就绪→松开”触发，松太快会概率性失败(卡牌又弹回手牌)。
+    路径用贝塞尔曲线从当前指针位置滑过去，而不是瞬移。
     """
     mouse = Controller()
-    mouse.press(Button.left)
-    try:
-        rand_sleep(0.1)
-        # 我方牌库中心点（客户区相对坐标，1920x1080 实测：1635,640）。
-        mouse.position = _to_screen(1635, 640, _display_mapping())
-        rand_sleep(DECK_DROP_HOLD_INTERVAL)
-    finally:
-        mouse.release(Button.left)
+    start = mouse.position
+    if start is None:
+        start = (960, 900)
+    end = _to_screen(1635, 640, _display_mapping())
+    _bezier_drag(mouse, start, end, hold_seconds=DECK_DROP_HOLD_INTERVAL)
 
 
 # 屏幕中间那两个「点掉遮挡」的位置：

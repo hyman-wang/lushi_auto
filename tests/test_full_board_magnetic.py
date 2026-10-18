@@ -115,12 +115,15 @@ class FullBoardMagneticTests(unittest.TestCase):
                 entity_num=7,
             )
 
-        self.assertEqual([
-            ("position", (890, 1000)),
-            ("press",),
-            ("position", (935, 600)),
-            ("release",),
-        ], mouse.events)
+        positions = [event[1] for event in mouse.events
+                     if event[0] == "position"]
+        self.assertGreater(len(positions), 2)
+        self.assertEqual((890, 1000), positions[0])
+        self.assertEqual((935, 600), positions[-1])
+        press_index = mouse.events.index(("press",))
+        self.assertEqual(("position", (890, 1000)),
+                         mouse.events[press_index - 1])
+        self.assertEqual(("release",), mouse.events[-1])
 
 
 if __name__ == "__main__":

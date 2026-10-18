@@ -34,6 +34,13 @@ reasonix.toml
 
 # hsctl 生成的「最高权限」计划任务启动器（每台机器路径不同，不该进仓库）
 log/hs_serve_elevated.cmd
+# 代码签名证书/私钥：正式发布用 CA 证书，本机自签名也不要入库
+*.pfx
+*.p12
+*.cer
+*.pvk
+*.key
+build/codesign/
 # 本机/临时产物
 .tmp-tests/
 .workbuddy/

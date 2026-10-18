@@ -870,7 +870,7 @@ class ManualController:
     def _choice_target_delay() -> float:
         """点完选项到点目标之间的等待（秒）：选项 UI 收起、目标高亮出现。"""
         try:
-            from src.recommendation_config import RecommendationConfig
+            from config import RecommendationConfig
             return float(RecommendationConfig().discover_target_delay_seconds)
         except Exception:
             return 0.3

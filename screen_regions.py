@@ -401,11 +401,15 @@ def _default_screen_metrics() -> tuple[int, int, int]:
 
 
 def _default_panel_detector(crop) -> bool:
-    """复用 DesktopCapture 的面板可见性判定（暗红顶栏 + 像素方差）。"""
+    """盒子面板可见性判定（暗红顶栏 + 像素方差）。"""
     import numpy as np
-    from src.capture.desktop_capture import DesktopCapture
     pixels = np.ascontiguousarray(np.asarray(crop.convert("RGB"))[:, :, ::-1])
-    return bool(DesktopCapture._panel_is_visible(pixels))
+    if pixels.size == 0 or float(np.std(pixels)) < 8.0:
+        return False
+    header = pixels[:45]
+    blue, green, red = header[:, :, 0], header[:, :, 1], header[:, :, 2]
+    red_dark = (red > green * 1.25) & (red > blue * 1.15) & (red < 140)
+    return float(np.mean(red_dark)) > 0.08
 
 
 _FONT_CACHE: dict[int, object] = {}

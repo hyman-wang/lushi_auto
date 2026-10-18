@@ -469,7 +469,6 @@ DELAY_KEYS = (
     "post_action_delay_seconds",
     "draw_extra_delay_per_card_seconds",
     "discover_target_delay_seconds",
-    "ocr_preprocess_scale",
 )
 # 生效时机（与 web_ui.py 的 _delay_effect_scope 保持一致，用于本地提示）。
 DELAY_EFFECT = {
@@ -481,7 +480,6 @@ DELAY_EFFECT = {
     "mulligan_post_ocr_delay_seconds": "next_start",
     "post_action_delay_seconds": "next_start",
     "draw_extra_delay_per_card_seconds": "next_start",
-    "ocr_preprocess_scale": "restart",
 }
 EFFECT_LABEL = {
     "live": "立即生效",

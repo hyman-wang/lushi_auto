@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import FSM_action
 from src.flow.mulligan_flow import MulliganFlow, MulliganStatus
-from src.recommendation_config import RecommendationConfig
+from config import RecommendationConfig
 
 
 class MulliganTimingTests(unittest.TestCase):

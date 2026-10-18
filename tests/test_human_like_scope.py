@@ -14,54 +14,8 @@ from manual_controller import ActionExecutionResult, EndTurnAction
 from src.flow.mulligan_flow import MulliganFlow, MulliganStatus
 from src.flow.recommendation_flow import FlowStepStatus, RecommendationFlow
 from src.game_state.recommendation_adapter import adapt_action
-from tests.support.recommendation_parser import RecommendationParser
-from src.recommendation_models import (
-    ActionKind, FrameEvidence, OcrEvidence,
-)
+from src.recommendation_models import ActionKind
 from src.safety.recommendation_validator import RecommendationValidator
-
-
-def _frame(frame_id, exact_hash):
-    return FrameEvidence(
-        frame_id=frame_id, captured_at=0.0, desktop_size=(1920, 1080), dpi=96,
-        window_handle=1, foreground=True,
-        recommendation_roi=(7, 32, 278, 970), exact_hash=exact_hash,
-        perceptual_hash="0" * 64, panel_visible=True)
-
-
-def _evidence(frame_id, text):
-    return OcrEvidence(frame_id=frame_id, created_at=0.0, lines=(),
-                       normalized_text=text, confidence=0.90,
-                       backend="test", preprocessing="test")
-
-
-class SequencedCapture:
-    def __init__(self):
-        self.frames = iter((_frame("stable", "before"),
-                            _frame("current", "before"),
-                            _frame("after", "after")))
-
-    def capture(self, ocr_panel_ok=False):
-        return next(self.frames)
-
-    @staticmethod
-    def crop_recommendation(current_frame):
-        return current_frame
-
-
-class SequencedReader:
-    def __init__(self):
-        self.read_count = 0
-
-    def read(self, frame_supplier, _roi_supplier):
-        current_frame = frame_supplier()
-        self.read_count += 1
-        return _evidence(current_frame.frame_id,
-                         "结束回合" if self.read_count == 1 else "等待对手操作")
-
-    @staticmethod
-    def read_frame(current_frame, _roi_supplier):
-        return _evidence(current_frame.frame_id, "结束回合")
 
 
 class RecordingController:

@@ -29,7 +29,6 @@ class _FrozenConfig:
     pre_action_delay_seconds: float = 7.0
     first_turn_per_card_delay_seconds: float = 3.5
     post_action_delay_seconds: float = 0.2
-    ocr_preprocess_scale: float = 1.4
 
 
 class _RunningThread:
@@ -143,11 +142,9 @@ class HotChannelTests(unittest.TestCase):
             result = web_ui.api_save_delays({
                 "hot": True,
                 "post_action_delay_seconds": 0.5,
-                "ocr_preprocess_scale": 2.0,
                 "discover_target_delay_seconds": 1.0})
         self.assertEqual(result["effects"]["discover_target_delay_seconds"], "live")
         self.assertEqual(result["effects"]["post_action_delay_seconds"], "next_start")
-        self.assertEqual(result["effects"]["ocr_preprocess_scale"], "restart")
         self.assertIn("note", result)
 
     def test_hot_delays_without_running_automation_only_persists(self):
@@ -191,8 +188,6 @@ class HotChannelTests(unittest.TestCase):
                          "live")
         self.assertEqual(web_ui._delay_effect_scope("post_action_delay_seconds"),
                          "next_start")
-        self.assertEqual(web_ui._delay_effect_scope("ocr_preprocess_scale"),
-                         "restart")
         # 每个白名单字段都必须被分类，不能漏
         from config import _USER_DELAY_KEYS
         for key in _USER_DELAY_KEYS:

@@ -277,7 +277,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="btn-row">
         <button id="btnSaveLiveness" class="btn btn-ghost" type="button">💾 保存存活检测</button>
       </div>
-      <div class="hint-line">挂机时最怕“炉石已经没了，脚本还在对着失效画面做 OCR”。开启后每个循环都会确认：<b>Hearthstone.exe 进程是否还在</b>（闪退/被关，权威信号），以及<b>对局中 Power.log 是否还在更新</b>（进程还在但游戏卡死）。判定退出会立刻在日志与浮窗<b>醒目告警并自动停止自动化</b>，不会空转到天亮。默认开启；自动化运行中不可修改。</div>
+      <div class="hint-line">挂机时最怕“炉石已经没了，脚本还在对着失效画面点鼠标”。开启后每个循环都会确认：<b>Hearthstone.exe 进程是否还在</b>（闪退/被关，权威信号），以及<b>对局中 Power.log 是否还在更新</b>（进程还在但游戏卡死）。判定退出会立刻在日志与浮窗<b>醒目告警并自动停止自动化</b>，不会空转到天亮。默认开启；自动化运行中不可修改。</div>
       <div class="hint-line" id="livenessStatus" style="margin-top:4px;color:var(--text)">存活状态：等待检测…</div>
     </section>
 
@@ -441,7 +441,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
         <label class="field">
           <span class="field-label">操作后延时（秒）</span>
           <input id="inpPostDelay" type="number" min="0" max="10" step="0.25">
-          <span class="field-hint">一次操作后到下轮 OCR 的间隔</span>
+          <span class="field-hint">一次操作后到下一轮读推荐的间隔</span>
         </label>
         <label class="field">
           <span class="field-label">抽牌额外延时（秒/张）</span>
@@ -452,11 +452,6 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
           <span class="field-label">抉择/发现选目标延时（秒）</span>
           <input id="inpChoiceTargetDelay" type="number" min="0" max="5" step="0.1">
           <span class="field-hint">选完选项到点它自带的目标之间的等待（鲍勃「招募随从」这类牌）</span>
-        </label>
-        <label class="field">
-          <span class="field-label">OCR 缩放</span>
-          <input id="inpOcrScale" type="number" min="0.5" max="4" step="0.1">
-          <span class="field-hint">识别精度/速度平衡点</span>
         </label>
       </div>
       <div class="btn-row">
@@ -470,7 +465,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <div class="btn-row">
         <button id="btnCalibrate" class="btn btn-ghost" type="button">📐 打开校准窗口（屏幕上）</button>
       </div>
-      <div class="hint-line">📐 <b>校准窗口</b>：<b>自动化没在跑的时候</b>打开，屏幕上显示<b>当前目标那一个框</b>（非当前目标不画，屏幕上不会全是框）+ 屏幕正中央的目标条 + 右侧推荐区域实时 OCR 预览，并提示<b>「请对齐相应UI」</b>。<b>12 个目标都能拖、都能存</b>：1 盒子推荐面板、2 换牌确认按钮、3 AI胜率浮动条（AI胜率兜底区域自动跟着外扩）、4 结算「开始」按钮（用框中心点击）、5 段位数字、6 主界面「传统对战」、7 选择套牌「选择套牌」标题、8 选择套牌 9 个卡组、9~12 四个模式按钮/盾牌（狂野/标准/休闲，框中心=点击点）。<b>Tab</b> 切换目标、<b>抓框正中央的四向箭头十字标整体拖动</b>（拖四条边也行，就是不好抓）、拖右下角手柄缩放、<b>抓目标条标题带 ✥ 可把整张目标条拖开</b>（目标行和按钮仍照常点；挪动只在本次打开期间有效，下次回屏幕正中）、<b>S</b> 保存（写入 <code>ui_config.json</code>，不覆盖名字/日志目录/延时）、<b>Esc</b> 退出。框<b>以外</b>的画面保持鼠标穿透（✛ 阶段判定点是只读参考，点不到炉石的地方照常点得到）。<b>保存后点一次「开始对战」即生效</b>，不用重启脚本。</div>
+      <div class="hint-line">📐 <b>校准窗口</b>：<b>自动化没在跑的时候</b>打开，屏幕上显示<b>当前目标那一个框</b>（非当前目标不画，屏幕上不会全是框）+ 屏幕正中央的目标条 + 右侧推荐区域预览，并提示<b>「请对齐相应UI」</b>。<b>12 个目标都能拖、都能存</b>：1 盒子推荐面板、2 换牌确认按钮、3 AI胜率浮动条（AI胜率兜底区域自动跟着外扩）、4 结算「开始」按钮（用框中心点击）、5 段位数字、6 主界面「传统对战」、7 选择套牌「选择套牌」标题、8 选择套牌 9 个卡组、9~12 四个模式按钮/盾牌（狂野/标准/休闲，框中心=点击点）。<b>Tab</b> 切换目标、<b>抓框正中央的四向箭头十字标整体拖动</b>（拖四条边也行，就是不好抓）、拖右下角手柄缩放、<b>抓目标条标题带 ✥ 可把整张目标条拖开</b>（目标行和按钮仍照常点；挪动只在本次打开期间有效，下次回屏幕正中）、<b>S</b> 保存（写入 <code>ui_config.json</code>，不覆盖名字/日志目录/延时）、<b>Esc</b> 退出。框<b>以外</b>的画面保持鼠标穿透（✛ 阶段判定点是只读参考，点不到炉石的地方照常点得到）。<b>保存后点一次「开始对战」即生效</b>，不用重启脚本。</div>
       <div class="hint-line">🧲 拖动/缩放炉石窗口时<b>五个框会实时跟着走</b>：坐标存的是「客户区相对位置」，校准一次之后窗口随便挪都不用重新校准。</div>
       <div class="hint-line">🖱️ 框以外的画面是<b>鼠标穿透</b>的：只有框/手柄/目标条上才拦鼠标，其余点击照常落到炉石上，可以边看游戏画面边调。顶部提示条每 1.5 秒重判一次「绿框里有没有盒子面板」，对齐好了会变绿。</div>
       <div class="hint-line">🧭 右上角<b>日志浮窗</b>的 <b>「校准」</b> 按钮打开的是<b>同一个窗口</b>（再点一次收起），三个入口不用记不同的用法。</div>
@@ -842,8 +837,7 @@ function render(s){
     $("inpPostDelay").value = s.delays.post_action_delay_seconds;
     $("inpDrawDelay").value = s.delays.draw_extra_delay_per_card_seconds;
     $("inpChoiceTargetDelay").value = s.delays.discover_target_delay_seconds;
-    $("inpOcrScale").value = s.delays.ocr_preprocess_scale;
-  }
+    }
 
   /* 延时设置说明：动态取自服务端当前配置，不硬编码 */
   if (s.delays){
@@ -856,8 +850,7 @@ function render(s){
       "回合前 " + d.pre_action_delay_seconds + "s / " +
       "操作后 " + d.post_action_delay_seconds + "s / " +
       "抽牌每张 " + d.draw_extra_delay_per_card_seconds + "s / " +
-      "抉择选目标 " + d.discover_target_delay_seconds + "s / " +
-      "OCR " + d.ocr_preprocess_scale + "。" +
+      "抉择选目标 " + d.discover_target_delay_seconds + "s。" +
       "写入 ui_config.json 的 delays 段即时生效（下次开局/下回合读取）；自动化运行中不可修改。";
   }
 
@@ -945,7 +938,7 @@ $("inpLog").addEventListener("input", function(){ dirty.log = true; });
 $("chkConcede").addEventListener("change", function(){ dirtyConcede = true; });
 $("inpConcedeThreshold").addEventListener("input", function(){ dirtyConcede = true; });
 $("inpConcedeRounds").addEventListener("input", function(){ dirtyConcede = true; });
-["inpReadyDelay","inpPostOcrDelay","inpRetryDelay","inpFirstTurnPerCard","inpPreDelay","inpPostDelay","inpDrawDelay","inpChoiceTargetDelay","inpOcrScale"]
+["inpReadyDelay","inpPostOcrDelay","inpRetryDelay","inpFirstTurnPerCard","inpPreDelay","inpPostDelay","inpDrawDelay","inpChoiceTargetDelay"]
   .forEach(function(id){ $(id).addEventListener("input", function(){ dirtyDelays = true; }); });
 
 function saveConfig(){
@@ -1271,8 +1264,7 @@ $("btnSaveDelays").addEventListener("click", function(){
     pre_action_delay_seconds: $("inpPreDelay").value,
     post_action_delay_seconds: $("inpPostDelay").value,
     draw_extra_delay_per_card_seconds: $("inpDrawDelay").value,
-    discover_target_delay_seconds: $("inpChoiceTargetDelay").value,
-    ocr_preprocess_scale: $("inpOcrScale").value
+    discover_target_delay_seconds: $("inpChoiceTargetDelay").value
   }).then(function(r){
     if (r.ok){
       toast(r.message, "ok");

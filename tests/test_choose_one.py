@@ -9,7 +9,6 @@ from log_state import LogState, update_state
 from manual_controller import ClickExecutor, ManualController, DiscoverChoiceAction
 from src.game_state.recommendation_adapter import adapt_action, RecommendationStateError
 from tests.support.recommendation_parser import RecommendationParser
-from src.recommendation_models import OcrEvidence, OcrLine
 
 
 class ChooseOneTests(unittest.TestCase):

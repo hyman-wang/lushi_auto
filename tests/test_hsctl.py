@@ -80,7 +80,6 @@ STATUS_FIXTURE = {
         "post_action_delay_seconds": 0.2,
         "draw_extra_delay_per_card_seconds": 1.0,
         "discover_target_delay_seconds": 2.0,
-        "ocr_preprocess_scale": 1.4,
     },
     "selfcheck": {"checked": True, "ok": True, "failed": 0, "warned": 0,
                   "summary": "全部通过", "checked_at": "2026-05-30T22:30:00",

@@ -22,8 +22,6 @@ from tests.support.recommendation_parser import (
 )
 from src.recommendation_models import (
     ActionKind,
-    FrameEvidence,
-    OcrEvidence,
 )
 from src.safety.recommendation_validator import RecommendationValidator
 
@@ -225,57 +223,6 @@ class RecordingController:
     def execute(self, action, _state):
         self.actions.append(action)
         return ActionExecutionResult(True, "executed")
-
-
-class PinnedTimelineHarness:
-    """Frames/reads 一直钉在同一句指令上，面板永不自行变化。
-
-    这样流程只由 _verify_result 的时间线分支决定结果，不受 OCR 漂移干扰。
-    """
-
-    def __init__(self, instruction):
-        self.instruction = instruction
-        self._frame_no = 0
-
-    def _frame(self, frame_id):
-        return FrameEvidence(
-            frame_id=frame_id,
-            captured_at=0.0,
-            desktop_size=(1920, 1080),
-            dpi=96,
-            window_handle=1,
-            foreground=True,
-            recommendation_roi=(7, 32, 278, 970),
-            exact_hash="same",
-            perceptual_hash="0" * 64,
-            panel_visible=True,
-        )
-
-    def capture(self, ocr_panel_ok=False):
-        self._frame_no += 1
-        return self._frame(f"f{self._frame_no}")
-
-    @staticmethod
-    def crop_recommendation(current_frame):
-        return current_frame
-
-    def read(self, frame_supplier, _roi_supplier):
-        current_frame = frame_supplier()
-        return self._evidence(current_frame.frame_id)
-
-    def read_frame(self, current_frame, _roi_supplier):
-        return self._evidence(current_frame.frame_id)
-
-    def _evidence(self, frame_id):
-        return OcrEvidence(
-            frame_id=frame_id,
-            created_at=0.0,
-            lines=(),
-            normalized_text=self.instruction,
-            confidence=0.90,
-            backend="test",
-            preprocessing="test",
-        )
 
 
 class TimelineFlowTests(unittest.TestCase):

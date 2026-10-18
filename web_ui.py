@@ -979,9 +979,6 @@ _DELAY_NEXT_START_KEYS = frozenset({
     "post_action_delay_seconds",
     "draw_extra_delay_per_card_seconds",
 })
-_DELAY_RESTART_KEYS = frozenset({
-    "ocr_preprocess_scale",
-})
 
 
 def _delay_effect_scope(key: str) -> str:
@@ -1273,7 +1270,6 @@ _DELAY_BOUNDS = {
     "post_action_delay_seconds": (0.0, 10.0),
     "draw_extra_delay_per_card_seconds": (0.0, 20.0),
     "discover_target_delay_seconds": (0.0, 5.0),
-    "ocr_preprocess_scale": (0.5, 4.0),
 }
 
 def _current_delays() -> dict:

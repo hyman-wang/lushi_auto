@@ -655,7 +655,6 @@ _USER_DELAY_KEYS = (
     "post_action_delay_seconds",
     "draw_extra_delay_per_card_seconds",
     "discover_target_delay_seconds",
-    "ocr_preprocess_scale",
 )
 
 
@@ -791,19 +790,9 @@ class RecommendationConfig:
     # 鲍勃「招募随从」（选完选项还要点一个对方随从）这类牌：选项菜单收起、目标
     # 高亮出现需要一点时间，太早点会点空。可通过 delays 段覆盖（网页可调）。
     discover_target_delay_seconds: float = 0.3
-    # 单次读取（截图+OCR+解析）的超时保护（秒）。
-    recognition_timeout_seconds: float = 2.0
     # 单次执行（点击操作）结果的等待/校验超时（秒）。
     result_timeout_seconds: float = 5.0
 
-    # ------------------------------------------------------------------ OCR
-    # 预处理缩放倍数：PP-OCRv6 对原生尺寸的小字更稳；实测 1.0x 比 1.4x
-    # 更准且不慢（1.4x 会把面板放大到检测上限之上，反而引入噪声）。
-    # 仍可用环境变量 OCR_PREPROCESS_SCALE 临时覆盖。
-    ocr_preprocess_scale: float = 1.0
-    # 自动线程数下限：OpenMP/MKL 线程默认取机器物理核数，
-    # 低于此下限固定为此值（核数少的机器保守）。
-    ocr_thread_min: int = 4
     # 调试用：每次 OCR 的实际输入图按顺序存盘目录（空 = 关闭）。
     # 若开启，会在该目录下生成 run_<HHMMSS>/001_*.png 系列，便于排查“识别
     # 到了什么图”。优先被环境变量 OCR_FRAME_DIR 覆盖。

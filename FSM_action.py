@@ -28,7 +28,7 @@ from src.recommendation.cdp_source import (
     CdpLadderStatsSource, CdpRecommendationSource, CdpWinrateSource,
 )
 from src.recommendation.mapper import payload_to_action
-from src.recommendation_config import RecommendationConfig
+from config import RecommendationConfig
 from src.recommendation_models import ActionKind
 from src.safety.hearthstone_liveness import default_monitor
 from src.safety.recommendation_validator import RecommendationValidator

@@ -723,56 +723,14 @@ class CalibrationSession:
         self.crop_event.set()
 
     def _ocr_worker(self) -> None:
-        try:
-            import numpy as np
-            from src.ocr.rapid_adapter import RapidOcrAdapter
-            from src.ocr.preprocess import iter_preprocess_recommendation
-
-            adapter = RapidOcrAdapter()
-            while self.running:
-                self.crop_event.wait(timeout=5.0)
-                self.crop_event.clear()
-                if not self.running:
-                    break
-                time.sleep(0.2)     # 节流：拖框时事件密，别满速空转
-                crop = self.last_crop
-                if crop is None:
-                    continue
-                # 预处理链路要 BGR 的 ndarray（cv2 约定）。
-                pixels = np.ascontiguousarray(np.asarray(crop)[:, :, ::-1])
-                started = time.time()
-                evidence = None
-                for tag, candidate in iter_preprocess_recommendation(pixels):
-                    if tag != "scaled_color_v1":
-                        continue
-                    evidence = adapter.recognize(
-                        candidate, f"calib-{id(crop)}", "calib_scaled")
-                    break
-                if evidence is None:
-                    continue
-                lines = [line.text for line in evidence.lines if line.text]
-                beacon = any("打法参考A" in text or "打法参考Ａ" in text
-                             for text in lines)
-                self.ocr_result = {
-                    "status": "ok", "lines": lines[:6], "beacon": beacon,
-                    "conf": evidence.confidence,
-                    "msg": f"OCR {len(lines)} 行 置信 {evidence.confidence:.2f}"
-                           f" 耗时 {time.time() - started:.0f}s",
-                }
-                self.dirty = True
-        except Exception as exc:
-            self.ocr_result = {"status": "error", "lines": [], "beacon": False,
-                               "conf": 0.0,
-                               "msg": f"OCR 未运行：{type(exc).__name__}: {exc}"}
-            self.dirty = True
+        # OCR 已移除：推荐改读盒子 JSON，校准窗口不再做文字预览。
+        self.ocr_result = {"status": "disabled", "lines": [], "beacon": False,
+                           "conf": 0.0, "msg": "OCR 已移除（推荐走盒子 JSON）"}
+        self.dirty = True
 
     def _start_ocr_thread(self) -> None:
-        if not self.ocr_enabled:
-            self.ocr_result = {"status": "off", "lines": [], "beacon": False,
-                               "conf": 0.0, "msg": "预览模式（--no-ocr）"}
-            return
-        threading.Thread(target=self._ocr_worker, name="calib-ocr",
-                         daemon=True).start()
+        self.ocr_result = {"status": "disabled", "lines": [], "beacon": False,
+                           "conf": 0.0, "msg": "OCR 已移除（推荐走盒子 JSON）"}
 
     # ------------------------------------------------------------ 渲染
     def _mapping(self):

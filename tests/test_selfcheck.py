@@ -47,8 +47,6 @@ class DependencyManifestTests(unittest.TestCase):
     def test_requirements_pins_are_parsed(self):
         pins = selfcheck._requirements_pins()
 
-        self.assertEqual("3.10.0", pins["rapidocr"])
-        self.assertEqual("1.31.0", pins["onnxruntime"])
         self.assertEqual("2.5.2", pins["numpy"])
 
     def test_manifest_covers_every_requirement(self):
@@ -71,7 +69,7 @@ class DependencyManifestTests(unittest.TestCase):
         keys = {selfcheck._normalize(spec["dist"][0])
                 for spec in selfcheck.DEPENDENCIES}
 
-        for expected in ("rapidocr", "onnxruntime", "pywin32", "numpy",
+        for expected in ("pywin32", "numpy",
                          "opencv-python-headless", "pillow", "pynput",
                          "keyboard", "psutil", "requests"):
             self.assertIn(expected, keys)
@@ -85,14 +83,14 @@ class DependencyManifestTests(unittest.TestCase):
 class DependencyItemTests(unittest.TestCase):
     def test_missing_package_fails_with_pip_hint(self):
         def importer(name):
-            if name == "rapidocr":
-                raise ImportError("No module named 'rapidocr'")
+            if name == "psutil":
+                raise ImportError("No module named 'psutil'")
             return object()
 
         items = selfcheck.dependency_items(importer=importer,
                                           version_reader=lambda dists: "1.0",
                                           pins={})
-        item = next(i for i in items if i["key"] == "rapidocr")
+        item = next(i for i in items if i["key"] == "psutil")
 
         self.assertEqual(selfcheck.STATUS_FAIL, item["status"])
         self.assertIn("ImportError", item["detail"])
@@ -211,7 +209,7 @@ class RealEnvironmentTests(unittest.TestCase):
     def test_all_declared_dependencies_are_importable(self):
         failing = [i["label"] for i in self.result["items"]
                    if i["key"] in {"pywin32", "opencv-python-headless", "numpy",
-                                   "pillow", "rapidocr", "onnxruntime"}
+                                   "pillow"}
                    and i["status"] == selfcheck.STATUS_FAIL]
 
         self.assertEqual([], failing)

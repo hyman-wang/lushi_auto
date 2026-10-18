@@ -200,11 +200,12 @@ class _Cdp:
                 return message.get("result", {})
         raise CdpError(f"CDP timeout: {method}")
 
-    def evaluate(self, expression: str, timeout: float = 2.0) -> Any:
+    def evaluate(self, expression: str, timeout: float = 2.0,
+                 await_promise: bool = False) -> Any:
         result = self.call("Runtime.evaluate", {
             "expression": expression,
             "returnByValue": True,
-            "awaitPromise": False,
+            "awaitPromise": bool(await_promise),
         }, timeout=timeout)
         if "exceptionDetails" in result:
             raise CdpError(
@@ -223,6 +224,8 @@ class _CdpPageSource:
     TARGET_HINTS: tuple = ()
     HOOK_JS: str = ""
     READ_JS: str = ""
+    READ_TIMEOUT: float = 2.0
+    AWAIT_PROMISE: bool = False
 
     def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
                  timeout: float = 2.0, retry_interval: float = 1.0,
@@ -251,12 +254,16 @@ class _CdpPageSource:
                 self._refresh_target()
                 if self._cdp is None:
                     self._connect()
-                raw = self._cdp.evaluate(self.READ_JS, timeout=self.timeout)
+                raw = self._cdp.evaluate(
+                    self.READ_JS, timeout=self.READ_TIMEOUT,
+                    await_promise=self.AWAIT_PROMISE)
                 data = json.loads(raw) if raw else {}
-                if not data.get("h"):
+                if self.HOOK_JS and not data.get("h"):
                     # 页面导航/刷新后 hook 丢了，补挂一次。
                     self._cdp.evaluate(self.HOOK_JS, timeout=self.timeout)
-                    raw = self._cdp.evaluate(self.READ_JS, timeout=self.timeout)
+                    raw = self._cdp.evaluate(
+                        self.READ_JS, timeout=self.READ_TIMEOUT,
+                        await_promise=self.AWAIT_PROMISE)
                     data = json.loads(raw) if raw else {}
                 self.last_error = None
                 return data
@@ -438,7 +445,6 @@ _WINRATE_READ = (
 
 
 class CdpWinrateSource(_CdpPageSource):
-    """读盒子「AI 预测胜率」浮条的 JSON（winrate-predict 页面）。"""
 
     TARGET_HINTS = ("winrate-predict", "client-jipaiqi")
     HOOK_JS = _WINRATE_HOOK
@@ -462,3 +468,81 @@ class CdpWinrateSource(_CdpPageSource):
         except (TypeError, ValueError):
             return None
         return value if 0.0 <= value <= 100.0 else None
+
+# ---------------------------------------------------------------------------
+# 传说名次（盒子排行接口）
+# ---------------------------------------------------------------------------
+class CdpLadderStatsSource(_CdpPageSource):
+    """从盒子 client-home 页调排行接口，拿传说名次（替代结算界面 OCR）。
+
+    盒子首页会带 sid 调
+    ``https://hs-api.lushi.163.com/hs/combat_static/ladder_static?sid=...``，
+    响应里 ``data.chuanshuo_rank.level`` 就是传说名次（例：48807）。
+    sid 从页面已发生的请求（performance entries）里取，随登录态变化。
+    """
+
+    TARGET_HINTS = ("client-home", "hs-web")
+    HOOK_JS = ""
+    AWAIT_PROMISE = True
+    READ_TIMEOUT = 6.0
+    CACHE_SECONDS = 5.0
+
+    READ_JS = r"""
+(async () => {
+  const urls = performance.getEntriesByType('resource').map(e => e.name);
+  let sid = null;
+  for (const u of urls) {
+    const m = u.match(/[?&]sid=([^&]+)/);
+    if (m) sid = decodeURIComponent(m[1]);
+  }
+  if (!sid) return JSON.stringify({h: false, status: 0, error: 'no_sid'});
+  const url = 'https://hs-api.lushi.163.com/hs/combat_static/ladder_static?sid='
+              + encodeURIComponent(sid);
+  try {
+    const r = await fetch(url, {credentials: 'include'});
+    const text = await r.text();
+    return JSON.stringify({h: true, status: r.status, body: text});
+  } catch (e) {
+    return JSON.stringify({h: true, status: -1, error: String(e)});
+  }
+})()
+"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._cache = None
+        self._cache_at = 0.0
+
+    def ladder_stats(self):
+        """返回 {duanwei, level, max_level, season}；读不到返回 None。"""
+        now = time.time()
+        if self._cache is not None and now - self._cache_at < self.CACHE_SECONDS:
+            return self._cache
+        stats = self._parse(self.read())
+        if stats is not None:
+            self._cache = stats
+            self._cache_at = now
+        return stats
+
+    @staticmethod
+    def _parse(data):
+        if not data or data.get("status") != 200:
+            return None
+        try:
+            payload = json.loads(data.get("body") or "{}")
+        except (TypeError, ValueError):
+            return None
+        if not payload.get("status"):
+            return None
+        info = payload.get("data") or {}
+        rank = info.get("chuanshuo_rank") or {}
+        try:
+            level = int(rank.get("level"))
+        except (TypeError, ValueError):
+            level = None
+        return {
+            "duanwei": rank.get("duanwei"),
+            "level": level,
+            "max_level": (info.get("max_chuanshuo_rank") or {}).get("level"),
+            "season": info.get("season"),
+        }

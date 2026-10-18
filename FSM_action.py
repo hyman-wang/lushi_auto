@@ -24,9 +24,8 @@ from src.flow.recommendation_flow import (
     FlowStepStatus, RecommendationFlow,
 )
 from src.game_state.recommendation_adapter import adapt_action
-from src.ocr.rapid_adapter import RapidOcrAdapter
 from src.recommendation.cdp_source import (
-    CdpRecommendationSource, CdpWinrateSource,
+    CdpLadderStatsSource, CdpRecommendationSource, CdpWinrateSource,
 )
 from src.recommendation.mapper import payload_to_action
 from src.recommendation_config import RecommendationConfig
@@ -61,8 +60,8 @@ recommendation_config = None
 recommendation_source = None
 # AI 胜率来源：winrate-predict 页面的推送（同样是 CEF JSON）。
 winrate_source = None
-# OCR 引擎只为「结算段位」保留（上分停止/控分）。
-ocr_backend = None
+# 传说名次来源：盒子排行接口（client-home 页里的 ladder_static）。
+rank_source = None
 recommendation_validator = None
 active_game_generation = -1
 mulligan_delay_generation = None
@@ -135,11 +134,11 @@ def initialize_recommendation_automation():
     「打法参考A/B」以 JSON 推给 ladder-opp 页面，``CdpRecommendationSource``
     直接读那份 JSON。开局/重开自动化只需重建轻量对象，CDP 连接跨局复用。
 
-    OCR 引擎只为「结算段位」保留（``ocr_backend``），推荐与 AI 胜率都走 CEF 推送。
+    OCR 引擎只剩「结算界面开始按钮」检测在用；推荐、AI 胜率、传说名次都走 CEF。
     """
     global auto_mulligan_flow, recommendation_flow
     global recommendation_config, recommendation_source, winrate_source
-    global ocr_backend, recommendation_validator
+    global rank_source, recommendation_validator
 
     recommendation_config = RecommendationConfig()
 
@@ -147,9 +146,9 @@ def initialize_recommendation_automation():
         recommendation_source = CdpRecommendationSource()
     if winrate_source is None:
         winrate_source = CdpWinrateSource()
+    if rank_source is None:
+        rank_source = CdpLadderStatsSource()
 
-    if ocr_backend is None:
-        ocr_backend = RapidOcrAdapter()
     if recommendation_validator is None:
         recommendation_validator = RecommendationValidator(
             recommendation_config)
@@ -540,7 +539,6 @@ def ChoosingHeroAction():
             attempts=_CHOOSING_HERO_RANK_READ_ATTEMPTS,
             wait=_CHOOSING_HERO_RANK_RETRY_WAIT,
             label="选择套牌界面",
-            min_confidence=_POST_GAME_MIN_CONFIDENCE,
             confirm=True)
     except Exception as exc:
         action = ""
@@ -976,21 +974,18 @@ def player_name_state() -> dict:
 # 按钮才算收尾完成。只在对局结算阶段使用：
 #   * _POST_GAME_START_BUTTON_ROI ：结算界面底部「开始」按钮的默认框，
 #     用户可以校准（ui_config.json 的 post_game_start_roi），点击点取框中心；
-#   * _POST_GAME_START_FALLBACK_ROI：检测「开始」的兜底框（框被拖小后仍能认出）；
-#   * _POST_GAME_RANK_ROI         ：段位数字的默认框（没上传说时这里是空白），
-#     同样可以校准（ui_config.json 的 post_game_rank_roi）。
+#     「开始」是否出现用 battle_entry 的模板匹配判断（不再 OCR）。
+#   * _POST_GAME_RANK_ROI         ：段位框，仍用于校准界面摆位（名次本身改读盒子接口）。
 # 推进结算界面点哪儿：**中间那两个点**（`click.ERROR_REPORT_POINTS` =
 # (1100,820) + (960,650)，原来用于错误弹窗/断线提示），每轮各点一次；
 # 第三个点（「开始」按钮正中心）只在检测到「开始」之后的收尾里点。右边那些
 # 辅助点不用（会被右上角日志浮窗吃掉/可能误点到下一屏），屏幕正中 (960,540)
 # 会落到下一局「选择卡组」界面的卡组上，也不用它。
 _POST_GAME_START_BUTTON_ROI = (1325, 865, 1475, 935)
-_POST_GAME_START_FALLBACK_ROI = (1250, 845, 1550, 945)
 _POST_GAME_START_DEFAULT_POINT = (1400, 900)
 _POST_GAME_RANK_ROI = (1230, 180, 1385, 225)
 _MAX_RANK_NUMBER = 100000
 # 小字号放大后再送 OCR（与 AI胜率浮动条同一套做法）。
-_POST_GAME_OCR_SCALE = 2.0
 # 收尾总轮数上限：每轮 = 点一下待命点 + 等 _POST_GAME_CLICK_WAIT 秒 +（可选）OCR。
 # 40 轮约 2~3 分钟；超时走原 FSM_ERROR 自愈路径（重启炉石），与改动前一致。
 _POST_GAME_MAX_CYCLES = 40
@@ -1009,8 +1004,6 @@ _POST_GAME_RANK_CONFIRM_WAIT = 0.6
 _CHOOSING_HERO_RANK_READ_ATTEMPTS = 4
 _CHOOSING_HERO_RANK_RETRY_WAIT = 1.2
 # 「开始」按钮的 OCR 关键词与最低置信度（繁体/英文一并兜住）。
-_POST_GAME_START_KEYWORDS = ("开始", "開始", "Play")
-_POST_GAME_MIN_CONFIDENCE = 0.5
 # -------------------------------------------------------------- 控分（action=keep）
 # 读到"名次比目标更靠前"时：点开始匹配 → 等进入对局 → 立刻投降 → 回到选卡组界面，
 # 再由主循环重新读名次（每次 dispatch 只投降一局，主循环持续做存活检测）。
@@ -1022,13 +1015,6 @@ _KEEP_SCORE_ENTER_WAIT = 2.0
 _KEEP_SCORE_BACK_ATTEMPTS = 20
 _KEEP_SCORE_BACK_WAIT = 2.0
 _KEEP_SCORE_MAX_PER_RUN = 40
-# 段位区域「是否空白」判定：区域内足够亮的像素少于这么多，就当没有数字。
-# 未上传说时该处是纯背景，直接跳过 OCR（省一次推理，也避免空图被误识别成数字）。
-_RANK_MIN_BRIGHT_PIXELS = 8
-_RANK_BRIGHT_THRESHOLD = 150.0
-# 全角数字/空格 → 半角（OCR 有时会把全角数字读出来）。
-_FULLWIDTH_DIGITS = str.maketrans(
-    "０１２３４５６７８９　", "0123456789 ")
 
 
 def _config_roi(key: str, default) -> tuple:
@@ -1119,134 +1105,39 @@ def _grab_region_client_grabber():
     return grab
 
 
-def _ocr_lines(box, scale: float, tag: str):
-    """对屏幕区域做一次 OCR，返回 OcrLine 列表；不可用/异常返回 None。
-
-    这里只服务「结算段位」读取；推荐链路已经不碰 OCR 了。
-    引擎跨局复用（``ocr_backend``），引擎没就绪时返回 None，由调用方回退。
-    """
-    reader = ocr_backend
-    img = _grab_region(box, scale)
-    if img is None or reader is None:
-        return None
-    try:
-        evidence = reader.recognize(
-            img, f"{tag}-{time.time():.3f}", tag)
-    except Exception:
-        return None
-    return list(evidence.lines)
-
-
-def _region_is_blank(img) -> bool:
-    """段位区域是不是「没有数字」的纯背景（未上传说）。
-
-    未上传说时段位数字的位置是空的，靠“亮像素太少”判定，直接跳过 OCR。
-    判不准（依赖异常）时返回 False = 当作有内容，交给 OCR 去读；
-    img 为 None（截图失败）也算“空”，但调用方会把它当成**还没读到**去重试。
-    """
-    if img is None:
-        return True
-    try:
-        import numpy as np
-        gray = np.asarray(img)
-        if gray.ndim == 3:
-            gray = gray[:, :, 0] * 0.114 + gray[:, :, 1] * 0.587 \
-                + gray[:, :, 2] * 0.299
-        return int((gray > _RANK_BRIGHT_THRESHOLD).sum()) < _RANK_MIN_BRIGHT_PIXELS
-    except Exception:
-        return False
-
-
-def _rank_bright_pixels(img) -> int:
-    """段位区域里「够亮」的像素个数（只用于日志/页面的失败原因，判不出来返回 -1）。"""
-    if img is None:
-        return -1
-    try:
-        import numpy as np
-        gray = np.asarray(img)
-        if gray.ndim == 3:
-            gray = gray[:, :, 0] * 0.114 + gray[:, :, 1] * 0.587 \
-                + gray[:, :, 2] * 0.299
-        return int((gray > _RANK_BRIGHT_THRESHOLD).sum())
-    except Exception:
-        return -1
-
-
-def parse_rank_text(text: str) -> dict:
-    """把结算界面段位区域的 OCR 文本解析成 {number, legend, raw, empty}。
-
-    判定只看数字（用户口径）：
-      * 这段区域在**未上传说时是空白的**，上了传说才会显示名次数字；
-      * 所以「读得到数字」＝已上传说，数字就是名次；「读不到数字」＝没上传说。
-    不做任何文字匹配（不再认「传说/傳奇/Legend」），只统一全角数字再取第一个
-    1.._MAX_RANK_NUMBER 的整数；文本里的其它字（如果有）不影响判定。
-    """
-    result = {"number": None, "legend": False, "raw": text, "empty": False}
-    if not text or not str(text).strip():
-        return result
-    normalized = str(text).translate(_FULLWIDTH_DIGITS)
-    compact = re.sub(r"\s+", "", normalized)
-    match = re.search(r"\d{1,6}", compact)
-    if match:
-        value = int(match.group(0))
-        if 1 <= value <= _MAX_RANK_NUMBER:
-            result["number"] = value
-    # 有数字就是传说（名次）；没数字就是没上传说。
-    result["legend"] = result["number"] is not None
-    return result
-
-
-def is_pure_rank_text(text: str) -> bool:
-    """整行是不是「只有名次数字」（允许全角数字和可选的前导「#」）。
-
-    给需要更严的检测用（例如必须在某一步之前就拦住点击时）：屏幕上别的
-    内容被 OCR 随口读出一个数字，不算「已上传说」。
-    """
-    compact = re.sub(r"\s+", "", str(text or "").translate(_FULLWIDTH_DIGITS))
-    return bool(re.fullmatch(r"#?\d{1,6}", compact))
-
-
 def read_rank_region(strict: bool = False, min_confidence: float = 0.0) -> dict:
-    """读一次段位区域的数字，返回 {number, legend, raw, empty, blank, bright}。
+    """读盒子排行接口里的传说名次（替代结算界面 OCR）。
 
-    * 读到数字 → number/legend 有值；
-    * 区域是空白 → empty=True（**可能只是动画还没把名次画出来**，调用方会重试）；
-    * 截图失败 → blank=True（这次不算数，读不出来）；
-    * OCR 不可用/读不到 → raw=None。
-    strict          ：只认「整行就是数字」（见 is_pure_rank_text）；
-    min_confidence  ：低于这个置信度的 OCR 行直接丢掉。
-    bright 是这个区域里「够亮」的像素个数（-1 = 判不出来），只用于日志与页面显示。
+    数据源：client-home 页面调用的
+    ``hs-api.lushi.163.com/hs/combat_static/ladder_static``，取
+    ``data.chuanshuo_rank.level``（例：48807）。
+
+    返回结构与旧版一致：``{number, legend, raw, empty, blank, bright}``：
+      * number/legend：读到传说名次；
+      * empty=True：接口通了，但当前不是传说（没有名次）；
+      * blank=True：接口没读到（没登录 / 断网 / 盒子没开），调用方会重试。
+    ``strict`` / ``min_confidence`` 只为兼容旧调用方保留，已无意义。
     """
+    del strict, min_confidence
     result = {"number": None, "legend": False, "raw": None,
               "empty": False, "blank": False, "bright": -1}
-    box = _post_game_rank_box()
-    img = _grab_region(box, _POST_GAME_OCR_SCALE)
-    blank = _region_is_blank(img)
-    result["blank"] = blank
-    result["bright"] = _rank_bright_pixels(img)
-    if blank:
-        # 截图失败也算空，但要标成“还没读到”（blank=True），由调用方重试；
-        # 真正截到图且亮像素太少时只是 empty，同样交给调用方决定重试几次。
-        result["empty"] = img is not None
+    if rank_source is None:
+        result["blank"] = True
         return result
-    lines = _ocr_lines(box, _POST_GAME_OCR_SCALE, "rank")
-    if lines is None:
+    try:
+        stats = rank_source.ladder_stats()
+    except Exception:
+        stats = None
+    if not stats:
+        result["blank"] = True
         return result
-    for line in lines:
-        text = str(getattr(line, "text", "") or "").strip()
-        confidence = float(getattr(line, "confidence", 0.0) or 0.0)
-        if min_confidence and confidence < float(min_confidence):
-            continue
-        if not text or not any(ch.isdigit() for ch in text):
-            # 没有数字的行（文字标签之类）一律忽略：判定只看数字。
-            continue
-        if strict and not is_pure_rank_text(text):
-            continue
-        parsed = parse_rank_text(text)
-        if parsed["number"] is not None:
-            parsed["blank"] = False
-            parsed["bright"] = result["bright"]
-            return parsed
+    result["raw"] = stats.get("duanwei")
+    level = stats.get("level")
+    if isinstance(level, int) and level > 0:
+        result["number"] = level
+        result["legend"] = True
+    else:
+        result["empty"] = True
     return result
 
 
@@ -1321,13 +1212,10 @@ def _read_rank_target(attempts=None, wait=None, label="选择套牌界面",
     ``""``（什么都不做）。判定见 :func:`_rank_action_for`。
 
     label         ：这一步叫什么（写进日志与页面，回答"到底检测了没有、在哪一步读的"）；
-    attempts/wait ：重试次数与间隔（空白/截图失败/OCR 没读到都算"还没读到"，
-                    会重试——这是实测踩过的坑：动画还没把名次画出来时第一次读
-                    会得出"未上传说"的错误结论）；
-    strict        ：只认「整行就是数字」（见 is_pure_rank_text）；
-    min_confidence：丢掉低于该置信度的 OCR 行；
+    attempts/wait ：重试次数与间隔（盒子接口没返回/没登录都算"还没读到"，会重试）；
+    strict / min_confidence：只为兼容旧调用保留（已无意义）；
     confirm       ：读到数字后隔 _POST_GAME_RANK_CONFIRM_WAIT 再读一次，两次都
-                    读到数字才算数（防止把过渡画面里的误识别当名次）。
+                    读到数字才算数（防止过渡态里读到旧名次）。
     """
     global _rank_stop_triggered, _rank_stop_stop_reason, _rank_last_read
     global _rank_last_phase
@@ -1351,13 +1239,11 @@ def _read_rank_target(attempts=None, wait=None, label="选择套牌界面",
     number = reading.get("number")
     if number is None:
         if reading.get("raw") is not None:
-            reason = f"读到的内容里没有名次数字（「{reading['raw']}」）"
-        elif reading.get("empty") \
-                and 0 <= reading.get("bright", -1) < _RANK_MIN_BRIGHT_PIXELS:
-            reason = (f"段位位置还是空白（亮像素 {reading['bright']} 个，"
-                      f"不够 {_RANK_MIN_BRIGHT_PIXELS} 个）")
+            reason = f"盒子显示当前段位「{reading['raw']}」，没有传说名次"
+        elif reading.get("empty"):
+            reason = "盒子排行接口显示当前不是传说（没有名次）"
         else:
-            reason = f"没读到数字（截图/OCR 未读到，已试 {total} 次）"
+            reason = f"没读到名次（盒子接口未返回，已试 {total} 次）"
         manual_controller.output(
             f"[SYS] 段位目标检测（{label}）：{reason} —— 按「还没上传说」处理。")
         return ""
@@ -1422,16 +1308,6 @@ def _post_game_start_box() -> tuple:
     return _config_roi("post_game_start_roi", _POST_GAME_START_BUTTON_ROI)
 
 
-def _post_game_rank_box() -> tuple:
-    """段位数字的读取框：优先用用户校准的 post_game_rank_roi。
-
-    段位数字的位置随分辨率/窗口位置变化（且不同界面布局下会偏），所以和其它
-    区域一样允许在校准窗口里拖（`screen_regions` 的 "rank" 目标）。
-    配置缺失/非法时回退代码默认值（_POST_GAME_RANK_ROI）。
-    """
-    return _config_roi("post_game_rank_roi", _POST_GAME_RANK_ROI)
-
-
 def post_game_start_point() -> tuple:
     """点「开始」按钮用的坐标：校准框的正中心（默认正好 (1400,900)）。
 
@@ -1454,22 +1330,19 @@ def click_post_game_start():
 def start_button_present() -> bool:
     """结算界面的「开始」按钮是否已经出现（出现即收尾完成）。
 
-    先读用户校准的框；读不到时再用固定兜底区域读一次（框被拖小/拖偏也能认出）。
-    OCR 不可用/异常一律返回 False：检测不到就继续点左上角待命点，绝不提前
-    跑掉（宁可多等一会儿，也不能在结算界面上空点着回到主界面）。
+    用 `battle_entry` 的模板匹配（assets/start_text.png）判断，不再 OCR：
+    和进对战流程认「开始」按钮用的是同一套模板/阈值，口径一致。
+    抓不到画面/异常一律返回 False：检测不到就继续点左上角待命点，绝不提前跑掉。
     """
-    for box in (_post_game_start_box(), _POST_GAME_START_FALLBACK_ROI):
-        lines = _ocr_lines(box, _POST_GAME_OCR_SCALE, "start")
-        if lines is None:
-            continue
-        for line in lines:
-            text = str(getattr(line, "text", "") or "")
-            confidence = float(getattr(line, "confidence", 0.0) or 0.0)
-            if confidence < _POST_GAME_MIN_CONFIDENCE:
-                continue
-            if any(keyword in text for keyword in _POST_GAME_START_KEYWORDS):
-                return True
-    return False
+    try:
+        import battle_entry
+        frame, _mapping = battle_entry.capture_client_frame()
+        if frame is None:
+            return False
+        info = battle_entry.identify(frame) or {}
+        return bool((info.get("start") or {}).get("visible"))
+    except Exception:
+        return False
 
 
 def click_post_game_point():

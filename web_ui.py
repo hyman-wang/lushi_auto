@@ -963,7 +963,7 @@ def _hot_requested(body) -> bool:
 #   * next_start—— 在 initialize_recommendation_automation() 里被**按值**快照进
 #                  MulliganFlow / RecommendationFlow 的构造参数，要等下一次
 #                  「开始对战」（fsm.init()）才生效；
-#   * restart   —— src/ocr/preprocess.py 在**模块导入期**就把值算成常量 _SCALE，
+#   * restart   —— 旧 OCR 预处理在**模块导入期**就把缩放算成常量，
 #                  连重开自动化都改不动，必须重启脚本进程。
 _DELAY_LIVE_KEYS = frozenset({
     "mulligan_ready_delay_seconds",
@@ -1390,6 +1390,20 @@ def _bring_hearthstone_foreground():
         _log("WARN", f"切换到炉石前台失败：{exc}")
 
 
+def _ensure_box_background():
+    """准备阶段在后台确保盒子带调试端口（不阻塞界面）。"""
+    import os
+    if os.environ.get("HS_NO_BOX_AUTOSTART") == "1":
+        return
+    try:
+        import box_launcher
+        result = box_launcher.ensure_box(restart=True)
+        _log("SYS" if result.get("ok") else "WARN",
+             f"[盒子] {result.get('message')}")
+    except Exception as exc:
+        _log("WARN", f"[盒子] 启动检查失败：{exc}")
+
+
 def api_prepare(body=None):
     """「开始运行」第一步：开日志浮窗 + 把炉石切到前台，但【不】开始自动对战。
 
@@ -1404,6 +1418,8 @@ def api_prepare(body=None):
         if CTRL.automation_thread is not None or CTRL.starting:
             return {"ok": False, "error": "自动化已经在运行中。"}
         CTRL.prepared = True
+    threading.Thread(target=_ensure_box_background,
+                     name="hs-box", daemon=True).start()
     status = None
     if log_overlay is not None and not log_overlay.is_running():
         try:

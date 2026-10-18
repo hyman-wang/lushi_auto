@@ -130,7 +130,7 @@ python hsctl.py stop                  # 立即停
 | 6 | 开打 | `start` |
 
 ```powershell
-Start-Process 'D:\炉石传说盒子\HSAng.exe' -ArgumentList '--remote-debugging-port=9222' -Verb RunAs  # ① 盒子（必须带调试端口，推荐走 CEF JSON）
+Start-Process 'D:\炉石传说盒子\HSAng.exe' -ArgumentList '--remote-debugging-port=9222' -Verb RunAs  # ① 盒子（一般由 hsctl prepare 自动带参数启动，这行是手动兜底）
 python hsctl.py serve start --via-task        # ② 控制台：提权、不弹 UAC
 python hsctl.py restart-hearthstone --yes     # ③ 战网启动器 → 炉石
 python hsctl.py enter-battle --deck 8         # ④ 认界面：点「传统对战」→ 选第 8 副卡组
@@ -283,7 +283,6 @@ python hsctl.py serve stop --hard                # 跳过自停，直接结束�
 | --- | --- |
 | 立即生效 | `mulligan_ready_delay_seconds`、`mulligan_retry_delay_seconds`、`pre_action_delay_seconds`、`first_turn_per_card_delay_seconds`、`discover_target_delay_seconds` |
 | 下次「开始对战」生效 | `mulligan_post_ocr_delay_seconds`、`post_action_delay_seconds`、`draw_extra_delay_per_card_seconds` |
-| **需重启脚本进程** | `ocr_preprocess_scale` |
 
 `hsctl delays set` 的回话里有 `effects` 字段直接告诉你每项的实际时机 —— **以此为准**，
 不要凭本表猜。活人感 / 存活检测 / 中断重启 / 自动投降 / 段位目标是每次读盘，改完立即生效。
@@ -443,7 +442,7 @@ python hsctl.py serve task-status      # 看有没有现成的「最高权限」
 
 ### 8.1 控制台跑在错误的 Python 上（自检"全部依赖 fail"）
 
-**症状**：`status` 里 `selfcheck.failed` 等于全部依赖数（pywin32/cv2/numpy/PIL/rapidocr/onnxruntime…
+**症状**：`status` 里 `selfcheck.failed` 等于全部依赖数（pywin32/cv2/numpy/PIL/psutil…
 一整排 `ModuleNotFoundError`），且 `selfcheck.executable` 指向的解释器版本不对
 （本项目要求 3.12，3.13+ 未在实测范围内）。
 

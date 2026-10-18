@@ -6,7 +6,7 @@
     左上角待命点（(70,60)，不是屏幕正中），OCR 到「开始」后才收尾。
   * 收尾顺序：先关掉可能压在按钮上的断线弹窗，再点「开始」按钮**正中心**
     （默认 (1400,900)，框可校准）。
-  * 段位判定只看数字：读得到数字＝已上传说（数字即名次），空白＝没上传说。
+  * 段位来自盒子排行接口（ladder_static 的 chuanshuo_rank.level），不再 OCR。
   * 段位**只在选择套牌界面读**（用户 2026-10-11 口径）：结算界面不读。
   * 处理方式 action：
       stop —— 名次数值 <= 目标 → 本局结束后停止（原「上分停止」语义）；
@@ -35,168 +35,41 @@ def lines(*pairs):
             for text, confidence in pairs]
 
 
-class ParseRankTextTests(unittest.TestCase):
-    """段位判定：只看数字（有数字=传说，没数字=没上传说）。"""
-
-    def test_only_digits_decide_legend(self):
-        cases = (
-            ("1234", 1234, True),        # 纯数字 = 传说名次
-            ("传说 1234", 1234, True),    # 文本里还有别的字也不影响
-            ("１２３", 123, True),        # 全角数字照样认
-            ("传说", None, False),        # 只有文字 = 没上传说
-            ("钻石 III", None, False),
-            ("", None, False),
-            ("   ", None, False),
-            (None, None, False),
-            ("999999", None, False),      # 超出 1..100000 不算数
-        )
-        for text, number, legend in cases:
-            with self.subTest(text=text):
-                parsed = FSM_action.parse_rank_text(text)
-
-                self.assertEqual(number, parsed["number"])
-                self.assertEqual(legend, parsed["legend"])
-                self.assertEqual(text, parsed["raw"])
-
-
-class BlankRegionTests(unittest.TestCase):
-    """未上传说时段位位置是空白：靠亮像素个数判定，直接跳过 OCR。"""
-
-    @staticmethod
-    def _image(rows):
-        import numpy as np
-        return np.asarray(rows, dtype="uint8")
-
-    def test_blank_detection_and_reader_shortcut(self):
-        dark = self._image([[[20, 20, 20]] * 20] * 10)
-        bright_row = [[20, 20, 20]] * 10 + [[240, 240, 240]] * 10
-        bright = self._image([bright_row] * 10)
-        calls = []
-
-        self.assertTrue(FSM_action._region_is_blank(dark))
-        self.assertTrue(FSM_action._region_is_blank(None))
-        self.assertFalse(FSM_action._region_is_blank(bright))
-
-        with (
-            patch.object(FSM_action, "_grab_region", return_value=dark),
-            patch.object(FSM_action, "_ocr_lines",
-                         side_effect=lambda *a, **k: calls.append(a)),
-        ):
-            reading = FSM_action.read_rank_region()
-
-        self.assertTrue(reading["empty"])
-        self.assertIsNone(reading["number"])
-        self.assertEqual([], calls)          # 空白不送 OCR
-
-
 class ReadRankRegionTests(unittest.TestCase):
-    """OCR 读段位：读得到就解析，读不到/没数字就不触发停止。"""
+    """段位来自盒子排行接口（ladder_static.chuanshuo_rank.level）。"""
 
-    def _read(self, ocr_lines):
-        with (
-            patch.object(FSM_action, "_grab_region", return_value=object()),
-            patch.object(FSM_action, "_region_is_blank", return_value=False),
-            patch.object(FSM_action, "_ocr_lines", return_value=ocr_lines),
-        ):
+    def _read(self, stats):
+        with patch.object(FSM_action, "rank_source",
+                          SimpleNamespace(ladder_stats=lambda: stats)):
             return FSM_action.read_rank_region()
 
-    def test_reads_number_from_any_line_with_digits(self):
-        cases = (
-            (lines(("传说 4321", 0.9)), 4321, True),
-            (lines(("继续", 0.9), ("88", 0.8)), 88, True),
-            # 全是文字（没数字）：没上传说
-            (lines(("钻石 III", 0.9)), None, False),
-            (None, None, False),             # OCR 不可用
-        )
-        for ocr_lines, number, legend in cases:
-            with self.subTest(number=number, legend=legend):
-                reading = self._read(ocr_lines)
+    def test_reads_legend_level(self):
+        reading = self._read({"duanwei": "传说", "level": 4321})
 
-                self.assertEqual(number, reading["number"])
-                self.assertEqual(legend, reading["legend"])
-                self.assertEqual(number is None, reading["raw"] is None)
+        self.assertEqual(4321, reading["number"])
+        self.assertTrue(reading["legend"])
+        self.assertEqual("传说", reading["raw"])
+        self.assertFalse(reading["blank"])
 
-    def test_strict_needs_a_line_that_is_only_the_number(self):
-        """严格模式：整行只有数字才算（用于"必须拦住点击"的那次检测）。"""
-        with (
-            patch.object(FSM_action, "_grab_region", return_value=object()),
-            patch.object(FSM_action, "_region_is_blank", return_value=False),
-            patch.object(FSM_action, "_ocr_lines",
-                         return_value=lines(("传说 4321", 0.9))),
-        ):
-            self.assertEqual(4321, FSM_action.read_rank_region()["number"])
-            self.assertIsNone(
-                FSM_action.read_rank_region(strict=True)["number"])
+    def test_non_legend_has_no_number(self):
+        reading = self._read({"duanwei": "钻石", "level": None})
 
-        with (
-            patch.object(FSM_action, "_grab_region", return_value=object()),
-            patch.object(FSM_action, "_region_is_blank", return_value=False),
-            patch.object(FSM_action, "_ocr_lines",
-                         return_value=lines((" ４３２１ ", 0.9))),
-        ):
-            self.assertEqual(4321,
-                             FSM_action.read_rank_region(strict=True)["number"])
+        self.assertIsNone(reading["number"])
+        self.assertFalse(reading["legend"])
+        self.assertTrue(reading["empty"])
+        self.assertFalse(reading["blank"])
 
-    def test_min_confidence_drops_shaky_lines(self):
-        with (
-            patch.object(FSM_action, "_grab_region", return_value=object()),
-            patch.object(FSM_action, "_region_is_blank", return_value=False),
-            patch.object(FSM_action, "_ocr_lines",
-                         return_value=lines(("4321", 0.3))),
-        ):
-            self.assertEqual(4321, FSM_action.read_rank_region()["number"])
-            self.assertIsNone(
-                FSM_action.read_rank_region(min_confidence=0.5)["number"])
+    def test_source_unavailable_asks_for_retry(self):
+        reading = self._read(None)
 
-    def test_the_calibrated_rank_box_is_what_gets_read(self):
-        """回归：段位数字必须从**用户校准过的**框里读（用户报告它没法校准）。"""
-        grabbed = []
+        self.assertTrue(reading["blank"])
+        self.assertIsNone(reading["number"])
 
-        def grab(box, scale=1.0):
-            grabbed.append(tuple(box))
-            return object()
+    def test_missing_source_is_blank(self):
+        with patch.object(FSM_action, "rank_source", None):
+            reading = FSM_action.read_rank_region()
 
-        def ocr(box, scale, tag):
-            grabbed.append(tuple(box))
-            return lines(("4321", 0.9))
-
-        saved = FSM_action.recommendation_config
-        try:
-            FSM_action.recommendation_config = SimpleNamespace(
-                post_game_rank_roi=(1200, 170, 1400, 230))
-            with (
-                patch.object(FSM_action, "_grab_region", side_effect=grab),
-                patch.object(FSM_action, "_region_is_blank", return_value=False),
-                patch.object(FSM_action, "_ocr_lines", side_effect=ocr),
-            ):
-                reading = FSM_action.read_rank_region()
-
-            self.assertEqual(4321, reading["number"])
-            self.assertEqual([(1200, 170, 1400, 230)] * 2, grabbed,
-                             "截图与 OCR 都要用校准后的框")
-            # 配置缺失时回退代码默认值。
-            FSM_action.recommendation_config = None
-            self.assertEqual(FSM_action._POST_GAME_RANK_ROI,
-                             FSM_action._post_game_rank_box())
-        finally:
-            FSM_action.recommendation_config = saved
-
-
-class PureRankTextTests(unittest.TestCase):
-    def test_only_bare_numbers_pass(self):
-        cases = (
-            ("4321", True),
-            ("#4321", True),
-            (" 43 ", True),
-            ("４３２１", True),
-            ("传说 4321", False),
-            ("4321 名", False),
-            ("", False),
-            (None, False),
-        )
-        for text, expected in cases:
-            with self.subTest(text=text):
-                self.assertEqual(expected, FSM_action.is_pure_rank_text(text))
+        self.assertTrue(reading["blank"])
 
 
 class RankConditionTests(unittest.TestCase):
@@ -499,35 +372,34 @@ class PostGameStartButtonTests(unittest.TestCase):
 
         self.assertEqual([(1550, 900)], clicks)
 
-    def test_start_keyword_and_fallback_region(self):
-        detected = lines(("开始", 0.9))
-        traditional = lines(("開始", 0.8))
-        low_confidence = lines(("开始", 0.3))
-        other = lines(("继续", 0.9))
+    def test_start_button_uses_template_matching(self):
+        frame = object()
+        mapping = SimpleNamespace(width=1920, height=1080)
 
-        with patch.object(FSM_action, "_ocr_lines", return_value=detected):
-            self.assertTrue(FSM_action.start_button_present())
-        with patch.object(FSM_action, "_ocr_lines", return_value=traditional):
-            self.assertTrue(FSM_action.start_button_present())
-        for ocr in (low_confidence, other, None):
-            with patch.object(FSM_action, "_ocr_lines", return_value=ocr):
-                self.assertFalse(FSM_action.start_button_present())
-
-        # 校准框读不到时用兜底区域再读一次
-        attempted = []
-
-        def fake_ocr(box, scale, tag):
-            attempted.append(tuple(box))
-            if len(attempted) == 1:
-                return other
-            return detected
-
-        with patch.object(FSM_action, "_ocr_lines", side_effect=fake_ocr):
+        with (
+            patch("battle_entry.capture_client_frame",
+                  return_value=(frame, mapping)),
+            patch("battle_entry.identify",
+                  return_value={"start": {"visible": True}}),
+        ):
             self.assertTrue(FSM_action.start_button_present())
 
-        self.assertEqual(2, len(attempted))
-        self.assertEqual(tuple(FSM_action._POST_GAME_START_FALLBACK_ROI),
-                         attempted[1])
+        with (
+            patch("battle_entry.capture_client_frame",
+                  return_value=(frame, mapping)),
+            patch("battle_entry.identify",
+                  return_value={"start": {"visible": False}}),
+        ):
+            self.assertFalse(FSM_action.start_button_present())
+
+        with patch("battle_entry.capture_client_frame",
+                   return_value=(None, None)):
+            self.assertFalse(FSM_action.start_button_present())
+
+    def test_start_button_detection_never_raises(self):
+        with patch("battle_entry.capture_client_frame",
+                   side_effect=RuntimeError("boom")):
+            self.assertFalse(FSM_action.start_button_present())
 
 
 class QuittingBattleTests(unittest.TestCase):

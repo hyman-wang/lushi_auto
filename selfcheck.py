@@ -13,7 +13,7 @@
     ❌ fail  必需项缺失/不满足，脚本很可能跑不起来或点了没反应，必须修。
 
 为什么死磕 Python 3.12：本项目全部实测环境都是 3.12.14（Windows 64 位），
-OCR 依赖（RapidOCR + ONNX Runtime）也是在这个版本上验证的；3.13+ 未在实测
+截图/模板匹配依赖也是在这个版本上验证的；3.13+ 未在实测
 范围内，3.11 及以下与验证环境不一致，容易出玄学问题。所以这里把
 「3.12 + 64 位」作为唯一推荐值，其它版本一律 ❌ 并给出安装提示。
 
@@ -56,13 +56,9 @@ DEPENDENCIES: tuple[dict, ...] = (
     {"imports": ("win32gui", "win32api", "win32ui", "pywintypes"),
      "dist": ("pywin32",), "why": "炉石窗口句柄 / 全屏截图 / 系统分辨率"},
     {"imports": ("cv2",), "dist": ("opencv-python-headless", "opencv-python"),
-     "why": "截图裁剪、颜色判定、OCR 预处理"},
+     "why": "截图裁剪、颜色判定"},
     {"imports": ("numpy",), "dist": ("numpy",), "why": "截图像素解析"},
     {"imports": ("PIL",), "dist": ("Pillow",), "why": "截图（ImageGrab）"},
-    {"imports": ("rapidocr",), "dist": ("rapidocr",),
-     "why": "盒子面板文字识别（PP-OCRv6 small）"},
-    {"imports": ("onnxruntime",), "dist": ("onnxruntime",),
-     "why": "OCR 推理后端（ONNX Runtime CPU）"},
     {"imports": ("psutil",), "dist": ("psutil",), "why": "炉石进程存活检测"},
     {"imports": ("keyboard",), "dist": ("keyboard",), "why": "Ctrl+Q 全局热键"},
     {"imports": ("pynput",), "dist": ("pynput",), "why": "鼠标移动与点击"},
@@ -138,7 +134,7 @@ def python_item(version: Optional[tuple] = None,
         return _item("python", label, STATUS_FAIL, detail, PYTHON_HINT)
     if int(bits) != 64:
         return _item("python", label, STATUS_FAIL, detail,
-                     "32 位 Python 装不上 OCR 依赖（onnxruntime 没有 32 位轮子），"
+                     "32 位 Python 装不上部分依赖（pywin32/opencv 等没有 32 位轮子），"
                      "请改装 64 位 Python 3.12。")
     return _item("python", label, STATUS_OK, detail)
 
@@ -277,27 +273,6 @@ def _load_ui_config() -> dict:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
-
-
-def _ocr_model_item() -> dict:
-    """RapidOCR 内置模型检查（wheel 自带 PP-OCRv6 small，缺了只需重装）。"""
-    purpose = "盒子面板文字识别用的 PP-OCRv6 small 模型"
-    try:
-        import rapidocr
-        root = Path(rapidocr.__file__).resolve().parent / "models"
-    except Exception as exc:
-        return _item("ocr-model", "OCR 模型", STATUS_WARN,
-                     f"无法定位 RapidOCR 内置模型：{type(exc).__name__}",
-                     "先安装 rapidocr（wheel 自带模型）。", False, purpose)
-    expected = ("PP-OCRv6_det_small.onnx", "PP-OCRv6_rec_small.onnx")
-    missing = [name for name in expected if not (root / name).is_file()]
-    if missing:
-        return _item("ocr-model", "OCR 模型", STATUS_WARN,
-                     f"缺少 {len(missing)} 个：{', '.join(missing)}",
-                     "重新安装 rapidocr（模型随 wheel 分发）。", False, purpose)
-    return _item("ocr-model", "OCR 模型", STATUS_OK,
-                 f"RapidOCR 内置 PP-OCRv6 small（{len(expected)} 个模型）",
-                 "", False, purpose)
 
 
 def _log_dir_item() -> dict:
@@ -448,7 +423,7 @@ def environment_items(config=None) -> list[dict]:
             "截图与点击可能对不上。", False, purpose)
 
     return ([admin] + _client_mapping_items(config) + [scaling]
-            + [_hearthstone_item(), _log_dir_item(), _ocr_model_item()])
+            + [_hearthstone_item(), _log_dir_item()])
 
 
 # ---------------------------------------------------------------- 总入口

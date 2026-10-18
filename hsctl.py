@@ -86,12 +86,12 @@ ENV_FILE = ROOT / "log" / "env.json"
 # 模板放在仓库根、并显式加进版本库（log/ 整个目录被忽略，里面放不了"要提交的"模板）。
 ENV_TEMPLATE = ROOT / "env.example.json"
 # 解释器校验：3.12.x + 这些模块必须**存在**（只 find_spec，不 import —— 不拉重依赖）。
-REQUIRED_MODULES = ("win32gui", "cv2", "numpy", "PIL", "rapidocr",
-                    "onnxruntime", "psutil", "keyboard", "pynput", "requests")
+REQUIRED_MODULES = ("win32gui", "cv2", "numpy", "PIL",
+                    "psutil", "keyboard", "pynput", "requests")
 # 模块名 → pip 包名（只用于给用户/agent 打印"缺哪个包该装什么"）。
 MODULE_PACKAGES = {
     "win32gui": "pywin32", "cv2": "opencv_python_headless", "PIL": "Pillow",
-    "rapidocr": "rapidocr", "onnxruntime": "onnxruntime", "psutil": "psutil",
+    "psutil": "psutil",
     "keyboard": "keyboard", "pynput": "pynput", "requests": "Requests",
     "numpy": "numpy",
 }
@@ -1101,7 +1101,31 @@ def cmd_resume(args, ctx: Ctx) -> int:
 
 
 def cmd_prepare(args, ctx: Ctx) -> int:
+    _ensure_box_once()
     return _ok_message(ctx, ctx.post("/api/prepare", {}))
+
+
+def _ensure_box_once(restart: bool = True) -> dict:
+    """确保盒子带调试端口（推荐/胜率/段位都靠它）。"""
+    import os
+    if os.environ.get("HS_NO_BOX_AUTOSTART") == "1":
+        return {"ok": True, "action": "skipped", "message": "已跳过盒子自动启动"}
+    try:
+        import box_launcher
+        result = box_launcher.ensure_box(restart=restart)
+    except Exception as exc:
+        result = {"ok": False, "action": "failed",
+                  "message": f"盒子启动检查失败：{exc}"}
+    print(f"[盒子] {result.get('message')}")
+    return result
+
+
+def cmd_box(args, ctx: Ctx) -> int:
+    """检查/启动盒子：默认只在没开时带参数启动，--restart 强制重启。"""
+    result = _ensure_box_once(restart=bool(getattr(args, "restart", False)))
+    if ctx.json:
+        print(json.dumps(result, ensure_ascii=False))
+    return EXIT_OK if result.get("ok") else EXIT_API
 
 
 def cmd_stop(args, ctx: Ctx) -> int:
@@ -2467,8 +2491,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(handler=cmd_resume)
 
     p = sub.add_parser("prepare", parents=[common],
-                       help="开始运行（准备）：开浮窗 + 切炉石前台，不开打")
+                       help="开始运行（准备）：确保盒子带调试端口 + 开浮窗 + 切炉石前台，不开打")
     p.set_defaults(handler=cmd_prepare)
+
+    p = sub.add_parser("box", parents=[common],
+                       help="检查盒子的 CEF 调试端口；没开就带参数启动（--restart 强制重启）")
+    p.add_argument("--restart", action="store_true",
+                   help="盒子在跑但没端口时，重启它（需要管理员；对局中会拒绝）")
+    p.set_defaults(handler=cmd_box)
 
     p = sub.add_parser("stop", parents=[common], help="停止自动化")
     p.add_argument("--after-game", action="store_true",

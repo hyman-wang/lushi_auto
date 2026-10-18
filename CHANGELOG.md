@@ -6,6 +6,7 @@
 
 | 日期 | 提交 | 一句话 |
 | --- | --- | --- |
+| 2026-10-18 | 本次（`feat/cdp-recommendation`） | **传说名次改读盒子排行接口**（ladder_static），OCR 只剩「结算界面开始按钮」；`hsctl prepare`/`box` 自动带调试端口启动盒子 |
 | 2026-10-18 | 本次（`feat/cdp-recommendation`） | **AI 胜率也改读盒子推送**；去掉换牌「确认」按钮检测；OCR 只剩结算段位一处 |
 | 2026-10-18 | 本次（`feat/cdp-recommendation`） | **推荐改读盒子 JSON**：不再截图/OCR；盒子必须带 `--remote-debugging-port=9222` 启动（见 README 第 4 步） |
 | 2026-10-18 | 本次（`feat/rapidocr-ppocrv6`） | **OCR 换引擎**：RapidOCR + PP-OCRv6 small（ONNX Runtime），去掉 PaddlePaddle/PaddleOCR；更新后跑一次 `pip install -r requirements.txt` |

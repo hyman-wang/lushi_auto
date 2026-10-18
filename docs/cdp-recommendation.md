@@ -116,27 +116,36 @@ https://hs-web-embed.lushi.163.com/client-jipaiqi/winrate-predict
 `CdpWinrateSource.win_rate()` 直接返回 `myWinRate`，`read_ai_win_rate()` 用它，
 不再截图/OCR。页面只在浮条打开时创建，source 会自动重扫 target 切过去。
 
-## 5. 结算段位：盒子拿不到
+## 5. 传说名次：走盒子排行接口
 
-查过所有 CEF 页面的全局函数与 RPC 方法：
+盒子首页会带 sid 调
+`https://hs-api.lushi.163.com/hs/combat_static/ladder_static?sid=...`，响应里就有名次：
 
-- 没有 `onUpdateRankData` / 段位推送；
-- `client-home` 的「排名」来自盒子服务端（`latest_score`），要登录参数、且是上传后的统计值，
-  不是结算瞬间的名次；
-- 所以**结算段位仍然保留 OCR**（`FSM_action.read_rank_region`），这是目前唯一的 OCR 用途。
+```json
+{"status": true, "logined": true,
+ "data": {"chuanshuo_rank": {"duanwei": "传说", "level": 48807},
+          "max_chuanshuo_rank": {"level": 46195},
+          "season": "202610"}}
+```
+
+`CdpLadderStatsSource` 从页面 `performance` 里取最近的 sid，再 fetch 这个接口；
+`FSM_action.read_rank_region()` 改成读它（返回结构不变），上分停止/控分不再 OCR。
+
+注意：这是盒子服务端统计值，**对局结束后要等盒子上传完才更新**（通常几秒）；
+`_read_rank_target` 原有的重试 + 二次复核正好覆盖这段延迟。
 
 ## 6. 代码位置
 
 | 文件 | 作用 |
 |---|---|
-| `src/recommendation/cdp_source.py` | 推荐 source（`ladder-opp`）+ AI 胜率 source（`winrate-predict`）；找页面、挂 hook、轮询、断线重连 |
+| `src/recommendation/cdp_source.py` | 推荐（`ladder-opp`）+ AI 胜率（`winrate-predict`）+ 传说名次（`client-home` 的 ladder_static）三个 source |
 | `src/recommendation/mapper.py` | JSON → `ProposedAction`（号位/目标/落位/文案） |
 | `src/flow/recommendation_flow.py` | 用推送版本号判断「新推荐/没变」，替代原来的截图哈希 |
 | `src/safety/recommendation_validator.py` | 去掉帧/DPI/OCR 校验，保留回合、日志版本、去重 |
-| `FSM_action.py` | 初始化两个 source；换牌建议走 `payload_to_action`；胜率走 `CdpWinrateSource` |
+| `box_launcher.py` | 启动/重启盒子并带 `--remote-debugging-port=9222`（`hsctl prepare`、网页「准备」自动调用） |
+| `FSM_action.py` | 初始化三个 source；换牌建议走 `payload_to_action`；胜率/名次走对应 source |
 
-OCR 现在只剩**一处**：结算界面段位数字（上分停止/控分）。
-换牌「确认」按钮检测已经删除（提交后等状态机 `turn > 0` 进入对局，15s 超时兜底）。
+OCR 已经**全部移除**：结算界面「开始」按钮改用 `battle_entry` 的模板匹配（assets/start_text.png），`src/ocr/`、`rapidocr`、`onnxruntime` 都已删除。
 
 ## 7. 排障
 

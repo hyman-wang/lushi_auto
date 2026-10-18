@@ -55,7 +55,7 @@ class FsmWiringTests(unittest.TestCase):
     def test_production_flow_gets_the_configured_draw_delay(self):
         """initialize_recommendation_automation() 必须把配置传进流程。"""
         names = ("recommendation_flow", "recommendation_config",
-                 "recommendation_source", "winrate_source", "ocr_backend",
+                 "recommendation_source", "winrate_source",
                  "recommendation_validator")
         originals = {name: getattr(FSM_action, name) for name in names}
 
@@ -71,7 +71,6 @@ class FsmWiringTests(unittest.TestCase):
         try:
             FSM_action.recommendation_source = object()
             FSM_action.winrate_source = object()
-            FSM_action.ocr_backend = object()
             FSM_action.recommendation_validator = object()
             with patch.object(FSM_action, "RecommendationConfig", stub_config):
                 FSM_action.initialize_recommendation_automation()

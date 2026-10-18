@@ -63,6 +63,8 @@ DEPENDENCIES: tuple[dict, ...] = (
     {"imports": ("keyboard",), "dist": ("keyboard",), "why": "Ctrl+Q 全局热键"},
     {"imports": ("pynput",), "dist": ("pynput",), "why": "鼠标移动与点击"},
     {"imports": ("requests",), "dist": ("Requests",), "why": "卡牌数据下载"},
+    {"imports": ("webview",), "dist": ("pywebview",), "required": False,
+     "why": "单窗口界面（WebView2；缺了退回浏览器）"},
 )
 
 _PIN_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;]+)")

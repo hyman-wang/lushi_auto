@@ -21,7 +21,9 @@ class BrandHeaderTests(unittest.TestCase):
     """浮窗顶部品牌行：只留本项目大名（副标题按用户要求删掉了）。"""
 
     def test_brand_name_has_no_subtitle(self):
-        self.assertEqual("HSLegendArriver", log_overlay.BRAND_NAME)
+        # 品牌行只留大名 + 统一版本号（version.py 是唯一来源），不再有副标题。
+        self.assertTrue(log_overlay.BRAND_NAME.startswith("HSLegendArriver"))
+        self.assertIn(log_overlay.__version__, log_overlay.BRAND_NAME)
         self.assertFalse(hasattr(log_overlay, "BRAND_SUB"))
         source = inspect.getsource(log_overlay._run)
         self.assertNotIn("BRAND_SUB", source)

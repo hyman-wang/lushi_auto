@@ -379,7 +379,9 @@ class WebPageTests(unittest.TestCase):
     def test_master_switch_row_has_no_numbers(self):
         """第 1 行只有总开关：随机延时上下限被挪到「看卡牌」那一行。"""
         start = self.html.index('id="chkHumanLike"')
-        row_start = self.html.rindex('<div class="input-row">', 0, start)
+        # 行式布局用 <div class="row">；老版本用 <div class="input-row">，两种都认。
+        row_start = max(self.html.rfind('<div class="row', 0, start),
+                        self.html.rfind('<div class="input-row">', 0, start))
         row_end = self.html.index("</div>", start)
         row = self.html[row_start:row_end]
         self.assertNotIn("inpHlMin", row)

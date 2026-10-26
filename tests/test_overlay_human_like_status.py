@@ -22,8 +22,10 @@ class BrandHeaderTests(unittest.TestCase):
 
     def test_brand_name_has_no_subtitle(self):
         # 品牌行只留大名 + 统一版本号（version.py 是唯一来源），不再有副标题。
-        self.assertTrue(log_overlay.BRAND_NAME.startswith("HSLegendArriver"))
-        self.assertIn(log_overlay.__version__, log_overlay.BRAND_NAME)
+        self.assertEqual(log_overlay.BRAND_NAME, "HSLegendArriver")
+        # 版本号单独一行小字（VERSION_TEXT），不再拼进 BRAND_NAME。
+        self.assertTrue(log_overlay.VERSION_TEXT.startswith("v"))
+        self.assertIn("2026.", log_overlay.VERSION_TEXT)
         self.assertFalse(hasattr(log_overlay, "BRAND_SUB"))
         source = inspect.getsource(log_overlay._run)
         self.assertNotIn("BRAND_SUB", source)

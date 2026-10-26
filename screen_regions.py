@@ -77,6 +77,10 @@ DECK_GRID_REGION = (366, 210, 1089, 858)
 MAIN_MENU_BATTLE_COLOR = "#f0c04a"
 DECK_SELECT_TITLE_COLOR = "#e88ab0"
 DECK_GRID_COLOR = "#8fd3e8"
+# 换牌阶段专用的推荐面板区域：比回合推荐大，能框住最多 4 条留牌建议。
+# 必须与 config.RecommendationConfig.mulligan_recommendation_roi 的默认值一致。
+MULLIGAN_RECOMMENDATION_REGION = (7, 200, 278, 970)
+MULLIGAN_RECOMMENDATION_COLOR = "#b6e05a"
 # 文字框可以很薄：校准窗口的缩放手柄默认不允许小于 MIN_SIZE(60)，这里放行到 20，
 # 否则 259×27 的「传统对战」框根本拖不出来（只能改配置文件）。
 TEXT_BOX_MIN_SIZE = 20
@@ -146,6 +150,13 @@ CALIBRATION_TARGETS = (
      "label": "盒子推荐面板", "short": "推荐面板", "color": "#63c76f",
      "default": (7, 200, 202, 500),
      "hint": "把盒子的「打法参考A」面板框进绿框"},
+    {"key": "mulligan_recommendation",
+     "config_key": "mulligan_recommendation_roi",
+     "label": "换牌推荐面板（最多4张留牌）", "short": "换牌推荐",
+     "color": MULLIGAN_RECOMMENDATION_COLOR,
+     "default": MULLIGAN_RECOMMENDATION_REGION,
+     "hint": "框住换牌阶段的留牌建议（最多 4 条）：换牌 OCR 专用，"
+             "比回合推荐区域更大；回合推荐仍用上一项的小区域"},
     {"key": "mulligan_confirm", "config_key": "mulligan_confirm_roi",
      "label": "换牌「确认」按钮", "short": "换牌确认", "color": "#5fa8e6",
      "default": (860, 810, 1060, 890),
@@ -318,6 +329,13 @@ def screenshot_regions(config=None) -> list[dict]:
          "box": by_key["recommendation"]["box"],
          "config_key": "recommendation_roi",
          "note": "对战中把盒子的「打法参考A」面板拖进这个绿框，脚本就靠它读出牌建议"},
+        {"key": "mulligan_recommendation",
+         "color": MULLIGAN_RECOMMENDATION_COLOR,
+         "label": "换牌推荐面板（换牌 OCR 专用，最多4张留牌）",
+         "box": by_key["mulligan_recommendation"]["box"],
+         "config_key": "mulligan_recommendation_roi",
+         "note": "换牌阶段的留牌建议区域：比回合推荐大，能框住最多 4 条建议；"
+                 "与回合 OCR 分开截图以提速"},
         {"key": "mulligan_confirm", "color": "#5fa8e6",
          "label": "换牌「确认」按钮（提交校验）",
          "box": by_key["mulligan_confirm"]["box"],
@@ -685,12 +703,12 @@ def build_region_preview(config=None, grabber: Optional[Callable] = None,
             checks.append(_check("dpi", "显示缩放（DPI）", STATUS_OK,
                                  f"{dpi}（{round(dpi / 96 * 100)}%）"))
         else:
-            # 不再当致命错误：换算是按物理像素做的，只是非 100% 缩放下
-            # 物理/逻辑像素会分裂，容易被别的东西搞乱，所以给提示。
+            # 非 100% 缩放不影响运行：坐标按物理像素换算，进程也声明了 DPI
+            # 感知，截图与点击的对应关系与缩放无关，这里只把真实值报出来。
             checks.append(_check(
                 "dpi", "显示缩放（DPI）", STATUS_WARN,
-                f"{dpi}（{round(dpi / 96 * 100)}%，建议 100%）",
-                "显示设置 → 缩放建议改成 100%：不是 100% 时物理/逻辑像素会分裂。",
+                f"{dpi}（{round(dpi / 96 * 100)}%）",
+                "不需要改：缩放不影响截图与点击的对应关系（坐标按物理像素换算）。",
                 required=False))
 
     # --- 换算可用性：客户区比例与尺寸（这两条才是真正的判定）

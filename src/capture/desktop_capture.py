@@ -112,8 +112,13 @@ class DesktopCapture:
         process_checker: Callable[[], bool] = _default_process_checker,
         window_reader: Callable[[], tuple] = _default_window_reader,
         clock: Callable[[], float] = time.time,
+        roi: Optional[tuple[int, int, int, int]] = None,
     ):
         self.config = config
+        # 每路 OCR 可以用自己的 ROI：换牌推荐区域比回合推荐大，二者分开截，
+        # 避免为了 4 张留牌把每回合的 OCR 截图一起放大。
+        self.roi = tuple(int(v) for v in (
+            roi if roi is not None else config.recommendation_roi))
         # ROI 抓图前先把客户区相对 ROI 换算成屏幕坐标：炉石窗口不在屏幕原点时，
         # 不换算就会截到别的地方（客户区相对坐标 ↔ 屏幕坐标见 display_mapping）。
         self.screen_grabber = (screen_grabber
@@ -125,33 +130,29 @@ class DesktopCapture:
         self.clock = clock
 
     def _screen_roi_box(self) -> tuple[int, int, int, int]:
-        """把配置里的推荐 ROI 换算成屏幕坐标框（拿不到客户区时原样返回）。"""
+        """把本实例的 ROI 换算成屏幕坐标框（拿不到客户区时原样返回）。"""
         from display_mapping import box_to_screen, display_mapping
-        return tuple(box_to_screen(self.config.recommendation_roi,
-                                   display_mapping()))
+        return tuple(box_to_screen(self.roi, display_mapping()))
 
     @property
     def _roi_size(self) -> tuple[int, int]:
-        left, top, right, bottom = self.config.recommendation_roi
+        left, top, right, bottom = self.roi
         return (bottom - top, right - left)
 
     def _is_roi_frame(self, width: int, height: int) -> bool:
-        """判断一帧是不是"只抓了推荐面板 ROI"的小图。
+        """这一帧是不是已经裁好的推荐面板 ROI（而非整帧）。
 
-        ROI 抓图走 box_to_screen 换算成屏幕物理坐标，客户区不是基准 1920×1080
-        时物理尺寸 ≠ 逻辑 ROI 尺寸（如 2560×1440 客户区下 195×300 → 261×401），
-        必须按**换算后的物理框尺寸**比；拿不到几何（display_mapping 为 None）时
-        box_to_screen 原样返回，物理=逻辑，退回逻辑尺寸比较（零回归）。
+        ROI 抓图会按客户区缩放（`_screen_roi_box` → `box_to_screen`），所以客户区
+        不是基准 1920×1080 时，ROI 帧的像素尺寸也≠基准尺寸。基准口径与**当前
+        客户区缩放后**的口径都认：前者兼容离线帧/单测，后者是缩小窗口下的真实
+        尺寸。只认基准会把缩放后的 ROI 误判成整帧，进而触发 client_size_mismatch
+        （用户实测 1785×902 时换牌一直重试）。
         """
-        try:
-            left, top, right, bottom = self._screen_roi_box()
-        except Exception:
-            pass
-        else:
-            if right > left and bottom > top:
-                return (width, height) == (right - left, bottom - top)
         roi_height, roi_width = self._roi_size
-        return (width, height) == (roi_width, roi_height)
+        if (width, height) == (roi_width, roi_height):
+            return True
+        left, top, right, bottom = self._screen_roi_box()
+        return (width, height) == (right - left, bottom - top)
 
     def from_file(self, path: Path | str) -> FrameEvidence:
         data = np.fromfile(str(path), dtype=np.uint8)
@@ -219,9 +220,13 @@ class DesktopCapture:
                 raise CaptureEnvironmentError(
                     f"client_size_mismatch:{width}x{height}"
                     f"!={client_size[0]}x{client_size[1]}")
+        # DPI 只**记录**、不再拦截：所有几何都按物理像素换算（display_mapping
+        # 拿真实客户区做缩放），显示缩放是 100% 还是 150% 都不影响"截到的图"与
+        # "要点的坐标"之间的对应关系。历史上这里会因 DPI≠config.desktop_dpi 直接
+        # 判失败，但进程声明 DPI 感知后（display_mapping.dpi_aware），
+        # GetDpiForSystem 返回的是真实值（150% → 144），那条门槛会把整条自动化
+        # 卡死在 dpi_mismatch 上（换牌推荐反复重试到超时）。
         effective_dpi = self.config.desktop_dpi if dpi is None else int(dpi)
-        if validate_environment and effective_dpi != self.config.desktop_dpi:
-            raise CaptureEnvironmentError(f"dpi_mismatch:{effective_dpi}")
 
         roi = (pixels[:, :, :3] if roi_frame
                else self._crop_array(pixels))
@@ -234,7 +239,7 @@ class DesktopCapture:
             frame_id=f"frame-{uuid.uuid4()}", captured_at=self.clock(),
             desktop_size=(desktop_width, desktop_height), dpi=effective_dpi,
             window_handle=window_handle, foreground=foreground,
-            recommendation_roi=self.config.recommendation_roi,
+            recommendation_roi=self.roi,
             exact_hash=exact_hash, perceptual_hash=perceptual_hash,
             panel_visible=panel_visible, pixels=pixels,
             client_size=(tuple(client_size) if client_size is not None else None),
@@ -247,7 +252,7 @@ class DesktopCapture:
         return self._crop_array(frame.pixels).copy()
 
     def _crop_array(self, pixels: np.ndarray) -> np.ndarray:
-        left, top, right, bottom = self.config.recommendation_roi
+        left, top, right, bottom = self.roi
         height, width = pixels.shape[:2]
         if left < 0 or top < 0 or right > width or bottom > height:
             raise CaptureEnvironmentError("recommendation_roi_out_of_bounds")

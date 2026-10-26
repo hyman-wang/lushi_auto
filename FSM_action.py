@@ -9,9 +9,10 @@ import keyboard
 
 import click
 import get_screen
+import surrender_rules
 from config import (
-    DEFAULT_AUTO_CONCEDE, SNAPSHOT_WRITE_INTERVAL, human_like_settings,
-    rank_stop_settings,
+    DEFAULT_AUTO_CONCEDE, DEFAULT_AUTO_SURRENDER, SNAPSHOT_WRITE_INTERVAL,
+    human_like_settings, rank_stop_settings,
 )
 from manual_controller import (
     ClickExecutor, GlobalHotkeyInput, ManualController,
@@ -57,6 +58,7 @@ auto_mulligan_flow = None
 recommendation_flow = None
 recommendation_config = None
 recommendation_capture = None
+mulligan_capture = None
 recommendation_parser = None
 recommendation_reader = None
 mulligan_reader = None
@@ -111,6 +113,36 @@ _keep_score_count = 0
 _rank_last_read = None
 _rank_last_phase = None
 
+# ---------------------------------------------------------------- 启动耗时
+# 用户反馈「浮窗点开始后按钮变了，但鼠标要等好一会才动」。启动链路里原先有几段
+# 固定等待（主界面 sleep 3s、选套牌 sleep 2s、界面识别 3s 一次），光看现象无法
+# 判断停在哪一步。这里给每个阶段打一行「进入对战 +x.xs：阶段」，一次自动化最多
+# 打几条；里程碑只在本轮启动后的 _START_LOG_LIMIT 秒内输出，避免长时间运行后误报。
+_START_T0 = None
+_START_MILESTONES = set()
+_START_LOG_LIMIT = 30.0
+
+
+def _start_milestone(label: str) -> None:
+    """记录并打印一条启动阶段耗时（同一阶段本轮只打一次）。"""
+    if _START_T0 is None or label in _START_MILESTONES:
+        return
+    elapsed = time.monotonic() - _START_T0
+    if elapsed > _START_LOG_LIMIT:
+        return
+    _START_MILESTONES.add(label)
+    try:
+        sys_print(f"[SYS] 进入对战 +{elapsed:.1f}s：{label}")
+    except Exception:
+        pass
+
+
+def _reset_start_milestones() -> None:
+    """每轮自动化开始：重新计时、清空已打过的阶段。"""
+    global _START_T0
+    _START_T0 = time.monotonic()
+    _START_MILESTONES.clear()
+
 
 def _automation_state():
     snapshot = refresh_snapshot()
@@ -134,13 +166,19 @@ def initialize_recommendation_automation():
     RapidOCR backend）仍只创建一次、跨对局复用。
     """
     global auto_mulligan_flow, recommendation_flow
-    global recommendation_config, recommendation_capture
+    global recommendation_config, recommendation_capture, mulligan_capture
     global recommendation_parser, recommendation_reader
     global mulligan_reader, recommendation_validator
 
     # 轻量：每次都重建，以便拾取校准后的最新 ROI / 尺寸配置。
     recommendation_config = RecommendationConfig()
     recommendation_capture = DesktopCapture(recommendation_config)
+    # 换牌推荐区域比回合推荐大（兼容 4 张留牌）：独立一个 capture，避免为了
+    # 换牌把每回合的 OCR 截图一起放大。
+    mulligan_capture = DesktopCapture(
+        recommendation_config,
+        roi=getattr(recommendation_config, "mulligan_recommendation_roi",
+                    recommendation_config.recommendation_roi))
 
     if recommendation_parser is None:
         recommendation_parser = RecommendationParser()
@@ -169,8 +207,8 @@ def initialize_recommendation_automation():
         # 换牌面板是否在场，由 OCR 证据裁定：识别出的文本必须能解析出
         # `替换N号位卡牌` 换牌句式（无"打法参考A"信标的专用 reader）。
         evidence = mulligan_reader.read(
-            lambda: recommendation_capture.capture(ocr_panel_ok=True),
-            recommendation_capture.crop_recommendation)
+            lambda: mulligan_capture.capture(ocr_panel_ok=True),
+            mulligan_capture.crop_recommendation)
         action = recommendation_parser.parse(
             evidence, log_state.game_num_turns_in_play, log_state.revision)
         if action.action != ActionKind.MULLIGAN:
@@ -184,8 +222,10 @@ def initialize_recommendation_automation():
         # 上游时序：OCR 前的每局等待由 ChoosingCardAction 的 ready 延时负责；
         # OCR 成功后立即点击，不再叠加缓冲（mulligan_post_ocr_delay=0）。
         first_delay=recommendation_config.mulligan_post_ocr_delay_seconds,
-        retry_delay=recommendation_config.mulligan_post_ocr_delay_seconds,
-        post_action_pause=_human_like_post_action_pause)
+        retry_delay=recommendation_config.mulligan_post_ocr_delay_seconds)
+    # 换牌故意**不接**「活人感」：换牌是开局固定流程，提交后马上进入对局，
+    # 对着手牌区随机悬停既不像真人也没意义（用户实测反馈）。活人感只挂在下面
+    # 对局内的 RecommendationFlow 上。
     recommendation_flow = RecommendationFlow(
         capture=recommendation_capture,
         reader=recommendation_reader,
@@ -207,16 +247,17 @@ def initialize_recommendation_automation():
 def _human_like_post_action_pause(action_kind=None) -> bool:
     """「活人感」延时：只在“对局中识别盒子意见并执行完”之后调用。
 
-    由 RecommendationFlow / MulliganFlow 在动作执行成功后调用，返回 True 表示
-    本次延时已被接管（随机 0.5~3s + 鼠标悬停），流程层不再叠加固定延时。
-    未开启时返回 False，走原来的固定「操作后延时」。匹配对手、选卡组、错误弹窗
-    取消这类非推荐动作不会经过这里。
+    只由 RecommendationFlow 在对局内动作执行成功后调用，返回 True 表示本次延时
+    已被接管（随机 0.5~3s + 鼠标悬停），流程层不再叠加固定延时。未开启时返回
+    False，走原来的固定「操作后延时」。匹配对手、选卡组、错误弹窗取消这类非推荐
+    动作不会经过这里；**换牌也不经过这里**（MulliganFlow 不接这个挂点）。
 
     action_kind：刚执行完的动作类型（ActionKind，可能为 None）。**攻击类动作不做
     活人感表演**（出手后还盯着手牌最像脚本，而且攻击常常是连着来的）：直接返回
     False，让流程走正常的固定「操作后延时」去读下一条推荐。星舰发射同理——它也是
-    场面上的动作（点场上星舰 → 点发射按钮），不看手牌。其它动作（出牌/技能/交易/
-    换牌）才看手牌。
+    场面上的动作（点场上星舰 → 点发射按钮），不看手牌。换牌（MULLIGAN）也跳过：
+    即便将来有人重新挂上挂点，也绝不在换牌后随机看手牌。其它动作（出牌/技能/
+    交易/地标）才看手牌。
 
     门禁是“总开关 + 看卡牌”：「随机延时」本身就是手牌悬停的那段等待窗口，所以
     关掉「看卡牌」= 连随机延时一起关掉（回到固定「操作后延时」），不再走到
@@ -229,7 +270,10 @@ def _human_like_post_action_pause(action_kind=None) -> bool:
         if not settings.get("hand_hover_enabled", True):
             return False
         # ActionKind 是 str 枚举，所以字符串 "attack" 也能匹配上。
-        if action_kind in (ActionKind.ATTACK, ActionKind.LAUNCH_STARSHIP):
+        # MULLIGAN 是防御性兜底：换牌流程本来就不挂这个挂点。
+        # SELECT_TARGET 是同一次出牌的收尾（选项结算后点目标），不额外看手牌。
+        if action_kind in (ActionKind.ATTACK, ActionKind.LAUNCH_STARSHIP,
+                           ActionKind.MULLIGAN, ActionKind.SELECT_TARGET):
             return False
         click.human_like_pause()
         return True
@@ -323,6 +367,8 @@ def reset_game_session():
     _name_match_result = None
     # 新一局重新建立“对手随从基线”，第一份快照只记录不悬停。
     _oppo_minion_ids = None
+    # 卡组识别投降：清掉上一局的事实（职业/打出/揭示/开局生效卡）。
+    surrender_rules.engine.reset()
     click.center_mouse()
 
 
@@ -377,6 +423,38 @@ def init():
     click.center_mouse()
 
 
+def _zone_before_update(state, container):
+    """这一行会不会改 ZONE？会的话返回改之前的旧区域。
+
+    为什么需要：`update_state()` 直接把新值写进实体，写完之后就再也拿不到
+    "原来在哪个区域"，而"打出"的判据正是 HAND → PLAY。所以必须在更新前
+    偷看一眼旧值。
+
+    两种写法都要认：
+    * `TAG_CHANGE Entity=[...] tag=ZONE value=PLAY` —— 只出现在**自己的牌**
+      打出时（日志里自己的手牌一直是已知实体）；
+    * `SHOW_ENTITY`/`FULL_ENTITY` 块里的 `tag=ZONE value=PLAY` —— **对手的牌**
+      打出时日志只会先 SHOW_ENTITY 揭示 CardID，再在它自己的 tag 块里移进
+      PLAY，没有 TAG_CHANGE 行。漏了后者，"对方打出过 X"的条件永远不成立。
+    """
+    try:
+        line_type = getattr(container, "line_type", None)
+        info = getattr(container, "info_dict", {}) or {}
+        if str(info.get("tag") or "") != "ZONE":
+            return None
+        if line_type == LOG_LINE_TAG_CHANGE:
+            entity = state.entity_dict.get(str(info.get("entity") or ""))
+        elif line_type == LOG_LINE_TAG:
+            entity = state.current_update_entity
+        else:
+            return None
+        if entity is None:
+            return None
+        return str(entity.query_tag("ZONE", "") or "")
+    except Exception:
+        return None
+
+
 def update_log_state():
     global active_game_generation
     global _last_snapshot_write
@@ -386,7 +464,12 @@ def update_log_state():
 
     previous_revision = log_state.revision
     for log_line_container in log_container.message_list:
+        # 卡组识别投降：先记住旧 ZONE（判断"打出"要用），再更新状态，
+        # 最后把这行喂给规则引擎（内部 try/except，绝不影响主循环）。
+        prev_zone = _zone_before_update(log_state, log_line_container)
         ok = update_state(log_state, log_line_container)
+        surrender_rules.engine.observe(log_state, log_line_container,
+                                       prev_zone=prev_zone)
         # if not ok:
         #     return False
 
@@ -539,7 +622,9 @@ def ChoosingHeroAction():
     if choose_hero_count >= 20:
         return FSM_ERROR
 
-    time.sleep(2)
+    # 只留一帧的 UI 稳定时间：原来固定等 2 秒，段位读取本身有重试（卡面没画出来
+    # 会重读），这里再死等只会把「点开始匹配」整体往后推。
+    time.sleep(0.2)
     # 排队前段位闸门（用户口径）：
     #   action=stop「上分停止」：读到名次已达标 → **不点**「开始匹配」，本局结束后停止；
     #   action=keep「控分」    ：读到名次比目标更靠前 → 进这一局后**开局即投降**，
@@ -556,6 +641,7 @@ def ChoosingHeroAction():
     except Exception as exc:
         action = ""
         warn_print(f"选择套牌界面段位检测失败（忽略，继续匹配）：{exc}")
+    _start_milestone("段位检测完成")
 
     if action == "stop":
         info_print(
@@ -573,21 +659,14 @@ def ChoosingHeroAction():
             _keep_score_once()
             return FSM_CHOOSING_HERO
 
-    # 上分闸门之后、点「开始」之前：按 ui_config.json 的 battle_entry.deck_index
-    # 选卡组（没配置就跳过，保持"你手选哪副就用哪副"的历史行为）。放在这里的三个
-    # 原因：① 主界面路径与"打完一局回来"都会经过这里；② 闸门命中时上面已经 return，
-    # 不会白选；③ 点「开始」的时机/语义完全没变。选之前会验"这一格确实像卡组"，
-    # 不像就一格都不点（避免在别的界面上乱点）。
-    try:
-        import battle_entry
-        picked = battle_entry.select_deck_if_configured(
-            logger=lambda text: info_print(f"[SYS] {text}"))
-        if not picked.get("ok") and not picked.get("skipped"):
-            warn_print(f"自动选卡组未完成：{picked.get('error')}")
-    except Exception as exc:
-        warn_print(f"自动选卡组失败（忽略，继续匹配）：{exc}")
-
+    # 选卡组：**不在自动化里自动点**（用户 2026-10-23 口径）。
+    # 旧行为是每局按 ui_config.json 的 battle_entry.deck_index 点第 N 格，
+    # 会覆盖玩家手选的卡组；现在只保留遥控显式命令：
+    #   * hsctl deck-click N       —— 自动化未运行时立即点第 N 格；
+    #   * hsctl enter-battle --deck N —— 进入对战时顺带选第 N 格。
+    # 需要换卡组时先停自动化再执行上述命令，不要在这里恢复自动点击。
     click.run_hearthstone_action(click.match_opponent)
+    _start_milestone("已点「开始匹配」")
     time.sleep(1)
     return FSM_MATCHING
 
@@ -1026,8 +1105,10 @@ _POST_GAME_RANK_CONFIRM_WAIT = 0.6
 # 「选择套牌/选人」界面（点「开始匹配」之前）的名次检测：名次是**点完「开始」
 # 之后那一屏**才画出来的，实测要 ~3 秒，所以这里多试几次；读到名次就不点
 # 「开始匹配」，直接停在本局之后。
+# 重试间隔从 1.2s 缩到 0.6s：卡面还没画出来时照样能重读到，但不会让「点开始匹配」
+# 白等（用户反馈按开始后要等好一会鼠标才动）。
 _CHOOSING_HERO_RANK_READ_ATTEMPTS = 4
-_CHOOSING_HERO_RANK_RETRY_WAIT = 1.2
+_CHOOSING_HERO_RANK_RETRY_WAIT = 0.6
 # 「开始」按钮的 OCR 关键词与最低置信度（繁体/英文一并兜住）。
 _POST_GAME_START_KEYWORDS = ("开始", "開始", "Play")
 _POST_GAME_MIN_CONFIDENCE = 0.5
@@ -1041,6 +1122,10 @@ _KEEP_SCORE_ENTER_ATTEMPTS = 20
 _KEEP_SCORE_ENTER_WAIT = 2.0
 _KEEP_SCORE_BACK_ATTEMPTS = 20
 _KEEP_SCORE_BACK_WAIT = 2.0
+# 进局后等「换牌阶段结束」的轮询：换牌要等玩家/对手确认，90s 足够覆盖正常
+# 换牌超时；超时就不点认输（宁可这局不控分，也绝不能在换牌阶段投降）。
+_KEEP_SCORE_MULLIGAN_ATTEMPTS = 90
+_KEEP_SCORE_MULLIGAN_WAIT = 1.0
 _KEEP_SCORE_MAX_PER_RUN = 40
 # 段位区域「是否空白」判定：区域内足够亮的像素少于这么多，就当没有数字。
 # 未上传说时该处是纯背景，直接跳过 OCR（省一次推理，也避免空图被误识别成数字）。
@@ -1346,8 +1431,9 @@ def _read_rank_target(attempts=None, wait=None, label="选择套牌界面",
                     会得出"未上传说"的错误结论）；
     strict        ：只认「整行就是数字」（见 is_pure_rank_text）；
     min_confidence：丢掉低于该置信度的 OCR 行；
-    confirm       ：读到数字后隔 _POST_GAME_RANK_CONFIRM_WAIT 再读一次，两次都
-                    读到数字才算数（防止把过渡画面里的误识别当名次）。
+    confirm       ：读数会触发动作（stop/keep）时，隔 _POST_GAME_RANK_CONFIRM_WAIT
+                    再读一次，两次都读到数字才算数（防止把过渡画面里的误识别当真）。
+                    不会触发动作的读数不复核——复核没有意义，还会拖慢「点开始匹配」。
     """
     global _rank_stop_triggered, _rank_stop_stop_reason, _rank_last_read
     global _rank_last_phase
@@ -1359,7 +1445,11 @@ def _read_rank_target(attempts=None, wait=None, label="选择套牌界面",
     total = _POST_GAME_RANK_READ_ATTEMPTS if attempts is None else int(attempts)
     interval = _POST_GAME_RANK_RETRY_WAIT if wait is None else float(wait)
     reading = _read_rank_with(total, interval, strict, min_confidence)
-    if confirm and reading.get("number") is not None:
+    if confirm and reading.get("number") is not None \
+            and _rank_action_for(reading, cfg):
+        # 只有这次读数**会触发动作**（上分停止 / 控分投降）才二次复核：复核的
+        # 目的就是「一次误识别不能停/投降」；不会触发动作的读数复核没有意义，
+        # 还会让「点开始匹配」白等 0.6s + 一次 OCR（用户反馈启动慢）。
         time.sleep(max(interval, _POST_GAME_RANK_CONFIRM_WAIT))
         again = read_rank_region(strict=strict,
                                  min_confidence=min_confidence)
@@ -1606,6 +1696,73 @@ def _load_concede_config():
         return dict(DEFAULT_AUTO_CONCEDE)
 
 
+# ---------------------------------------------------------------- 卡组识别投降
+# 敌我判反时"暂停判定"的提示，每局只打一次。
+_NAME_MISMATCH_SURRENDER_WARNED = None
+
+
+def _load_surrender_config():
+    """读取卡组识别投降配置（ui_config.json 的 auto_surrender 段）。
+
+    每次都读文件：网页保存后立即生效，不用重启自动化。
+    """
+    try:
+        import json
+        from pathlib import Path
+        path = Path(__file__).resolve().parent / "ui_config.json"
+        raw = json.loads(path.read_text(encoding="utf-8")).get("auto_surrender")
+        if not isinstance(raw, dict):
+            return dict(DEFAULT_AUTO_SURRENDER)
+        return raw
+    except Exception:
+        return dict(DEFAULT_AUTO_SURRENDER)
+
+
+def _maybe_surrender_by_rules():
+    """卡组识别投降：命中返回命中信息（调用方再去点认输），否则 None。
+
+    必须**在 `is_my_turn` 之前**调用。用户的需求是"对方在前四回合打出某卡
+    就投降"，而对手打牌发生在他自己的回合；只在己方回合判定就永远错过。
+    """
+    global _NAME_MISMATCH_SURRENDER_WARNED
+    if quitting_flag or _concede_triggered:
+        return None
+    cfg = _load_surrender_config()
+    if not cfg.get("enabled"):
+        return None
+
+    # 敌我可能判反（配置的用户 ID 与日志昵称对不上）：一律不判定。
+    # 这时"对方的卡"有可能其实是我方的卡，宁可错过也不误投降。
+    info = _name_match_result
+    if isinstance(info, dict) and info.get("matched") is False:
+        key = (log_state.game_generation, "name_mismatch")
+        if _NAME_MISMATCH_SURRENDER_WARNED != key:
+            _NAME_MISMATCH_SURRENDER_WARNED = key
+            manual_controller.output(
+                "[SYS] 卡组识别投降：用户 ID 与日志玩家名不匹配，"
+                "无法可靠区分敌我，本局暂停判定（胜率投降不受影响）。")
+        return None
+
+    hit = surrender_rules.engine.check(cfg, log_state)
+    if hit is None:
+        return None
+    details = "；".join(hit.get("evidence") or [])
+    manual_controller.output(
+        f"[SYS] 识别为对方卡组「{hit['name']}」→ 投降"
+        + (f"（{details}）" if details else ""))
+    return hit
+
+
+def surrender_rule_state():
+    """给网页/浮层：当前卡组识别配置 + 实时进度（哪套卡组满足到第几项）。"""
+    cfg = _load_surrender_config()
+    try:
+        state = surrender_rules.engine.status(log_state)
+    except Exception as exc:
+        state = {"error": str(exc), "decks": []}
+    return {"config": cfg, "state": state}
+
+
 def read_ai_win_rate():
     """OCR 左上角盒子“AI胜率 X%”，返回百分数值；读不到返回 None。
 
@@ -1690,11 +1847,15 @@ def _maybe_concede(snapshot):
     return False
 
 
-def _do_concede():
-    """点击右下角齿轮 → 等菜单弹出 → 点中间红色“认输”。"""
+def _do_concede(reason=None):
+    """点击右下角齿轮 → 等菜单弹出 → 点中间红色“认输”。
+
+    `reason` 只影响提示文案（默认沿用原来的「持续低胜率」），
+    卡组识别投降会传「识别为对方卡组「X」」。
+    """
     global concede_count
     concede_count += 1
-    manual_controller.output("[SYS] 持续低胜率，开始自动认输……")
+    manual_controller.output(f"[SYS] {reason or '持续低胜率'}，开始自动认输……")
     try:
         with click.hearthstone_action_session():
             click.click_setting()      # 齿轮 (1895, 1060)
@@ -1758,12 +1919,85 @@ def _at_deck_select() -> bool:
         return False
 
 
+def _game_ended() -> bool:
+    """对局是否已经结束（COMPLETE）。日志不可用/异常返回 False。"""
+    try:
+        return bool(update_log_state() and log_state.is_end)
+    except Exception:
+        return False
+
+
+def _mulligan_finished(baseline_generation=None) -> bool:
+    """换牌阶段是否已经结束（第一回合已开始）。
+
+    用 `game_num_turns_in_play > 0` 作为判据（与 `ChoosingCardAction` /
+    `wait_until_battle_starts` 同一口径）。`baseline_generation` 是点「开始匹配」
+    前的日志 generation：只有 generation 变了、并且回合数 > 0，才说明是**这一局**
+    的换牌真的结束了——否则上一局日志残留的回合数会让控分在换牌阶段就投降。
+    """
+    try:
+        if not update_log_state():
+            return False
+        if log_state.is_end:
+            return False
+        if (baseline_generation is not None
+                and log_state.game_generation == baseline_generation):
+            return False
+        return int(log_state.game_num_turns_in_play or 0) > 0
+    except Exception:
+        return False
+
+
+def _confirm_mulligan_if_ready() -> bool:
+    """换牌确认按钮在场时提交空换牌（不替换任何牌）。
+
+    控分局的目标是尽快输掉，没必要按留牌推荐换牌；但也不能在换牌界面
+    直接投降。先确认按钮在场再点，避免换牌还没画好就盲点。
+    """
+    try:
+        if not confirm_button_present():
+            return False
+        click.run_hearthstone_action(click.commit_choose_card)
+        info_print("[SYS] 控分：已提交换牌（不替换手牌），等待换牌阶段结束……")
+        return True
+    except Exception as exc:
+        warn_print(f"[SYS] 控分：提交换牌失败：{exc}")
+        return False
+
+
+def _wait_for_mulligan_end(baseline_generation=None) -> bool:
+    """等换牌阶段真正结束；期间尝试提交一次空换牌。
+
+    返回 True 才允许认输。收到停止请求、对局提前结束或超时都返回 False，
+    调用方据此放弃本次投降，绝不把「换牌中」当成「换牌结束」。
+    """
+    confirmed = False
+    total = max(1, int(_KEEP_SCORE_MULLIGAN_ATTEMPTS))
+    for attempt in range(1, total + 1):
+        if quitting_flag or stop_after_current_game:
+            warn_print("[SYS] 控分：收到停止请求，中止换牌等待，不点认输。")
+            return False
+        if _mulligan_finished(baseline_generation):
+            return True
+        if _game_ended():
+            warn_print("[SYS] 控分：对局在换牌阶段就结束了，不点认输。")
+            return False
+        if not confirmed:
+            confirmed = _confirm_mulligan_if_ready()
+        if attempt % 5 == 0:
+            info_print(
+                f"[SYS] 控分：等待换牌阶段结束……（{attempt}/{total}）")
+        time.sleep(_KEEP_SCORE_MULLIGAN_WAIT)
+    return False
+
+
 def _keep_score_once() -> bool:
     """控分：投一局把名次往后压。成功返回 True（已回到选卡组界面）。
 
-    流程（用户 2026-10-11 口径：开局直接投降）：
-      ① 点「开始匹配」进对局 → ② 等到真的进了局 → ③ 立刻认输 →
-      ④ 等回到选卡组界面。调用方随后会重新读名次，决定还要不要再投一局。
+    流程（用户 2026-10-23 口径）：
+      ① 点「开始匹配」进对局 → ② 等到真的进了局 → ③ **等换牌阶段结束**
+      （确认按钮在场时提交空换牌）→ ④ 才认输 → ⑤ 等回到选卡组界面。
+      换牌阶段内绝不点投降；等待失败/对局提前结束都不投降。
 
     **每次只投一局**，然后交还主循环：这样存活检测照常跑，也不会在这里长时间阻塞。
     任何一步超时都返回 False（不硬撑、不空转），由调用方决定后续。
@@ -1773,6 +2007,10 @@ def _keep_score_once() -> bool:
     manual_controller.output(
         f"[SYS] 控分：本局名次比目标更靠前，开始「开局即投降」"
         f"（本次运行第 {_keep_score_count} 局）。")
+    try:
+        baseline_generation = log_state.game_generation
+    except Exception:
+        baseline_generation = None
     # ① 点「开始匹配」（与正常开局同一个动作，保证语义一致）。
     try:
         click.run_hearthstone_action(click.match_opponent)
@@ -1787,8 +2025,16 @@ def _keep_score_once() -> bool:
     if not entered:
         warn_print("[SYS] 控分：等了很久也没进对局，放弃本次投降（下局再试）。")
         return False
-    # ③ 进局后立刻认输（给换牌界面一点时间，免得点空）。
-    time.sleep(1.5)
+    # ③ 等换牌阶段结束：这是用户明确要求的投降时机。
+    manual_controller.output(
+        "[SYS] 控分：已进入对局，等待换牌阶段结束（不替换手牌）……")
+    if not _wait_for_mulligan_end(baseline_generation):
+        warn_print("[SYS] 控分：换牌阶段未结束或对局已结束，本次不点认输（下局再试）。")
+        return False
+    if _game_ended():
+        warn_print("[SYS] 控分：对局已结束，跳过认输。")
+        return False
+    manual_controller.output("[SYS] 控分：换牌阶段已结束，开始认输。")
     try:
         click.run_hearthstone_action(_do_concede)
     except Exception as exc:
@@ -1811,6 +2057,7 @@ def _keep_score_once() -> bool:
 def run_automatic_battle_step():
     """Observe opponent turns; execute one newly validated player action."""
     global player_turn_delay_key, last_automation_diagnostic, _ocr_fail_streak
+    global _concede_triggered
 
     snapshot = refresh_snapshot()
     if snapshot is None:
@@ -1822,6 +2069,13 @@ def run_automatic_battle_step():
     if _concede_triggered:
         # 已触发自动认输：等待日志确认对局真正结束（COMPLETE）后再走结算计数，
         # 避免点完认输立刻计数导致“完成对局”时机不准。
+        return None
+    # 卡组识别投降：**在 is_my_turn 之前**判定 —— 特征卡往往是对手在他自己
+    # 回合打出的，等到我方回合再看就已经晚了。命中就立刻点认输。
+    surrender_hit = _maybe_surrender_by_rules()
+    if surrender_hit is not None:
+        _concede_triggered = True
+        _do_concede(reason=f"识别为对方卡组「{surrender_hit['name']}」")
         return None
     if not snapshot.is_my_turn:
         # 活人感：对手回合里出现新随从就移上去悬停（只移动不点击）；
@@ -1998,7 +2252,10 @@ def MainMenuAction():
     """
     print_out()
 
-    time.sleep(3)
+    # 只留一帧的 UI 稳定时间：能走到这里说明 _initial_fsm_state 已经认出主界面，
+    # enter_battle 自己会「识别 → 点中心 → 再识别」，原来固定等 3 秒纯属白等
+    # （用户反馈：点开始后鼠标要等好一会才动）。
+    time.sleep(0.2)
 
     import battle_entry
     result = battle_entry.enter_battle(
@@ -2006,6 +2263,7 @@ def MainMenuAction():
         should_abort=lambda: bool(quitting_flag or stop_after_current_game),
         logger=lambda text: sys_print(f"[SYS] {text}"))
     if result.get("ok"):
+        _start_milestone("已点「传统对战」并认出选套牌界面")
         return FSM_CHOOSING_HERO
     if result.get("stage") == "aborted":
         sys.exit(0)
@@ -2094,14 +2352,19 @@ def _initial_fsm_state():
         pass
     if log_state.game_entity_id != 0 and not log_state.is_end:
         if log_state.game_num_turns_in_play > 0:
+            _start_milestone("初始状态=对战中（Power.log）")
             return FSM_BATTLING
+        _start_milestone("初始状态=换牌（Power.log）")
         return FSM_CHOOSING_CARD
     state = get_screen.get_state()
+    _start_milestone(f"初始状态={state or FSM_MAIN_MENU}（屏幕识别）")
     return state if state else FSM_MAIN_MENU
 
 
 def AutoHS_automata():
     global FSM_state, quitting_flag
+
+    _reset_start_milestones()
 
     if get_screen.test_hs_available():
         hs_hwnd = get_screen.get_HS_hwnd()

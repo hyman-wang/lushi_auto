@@ -69,6 +69,10 @@ DEPENDENCIES: tuple[dict, ...] = (
     {"imports": ("requests",), "dist": ("Requests",), "why": "卡牌数据下载"},
     {"imports": ("webview",), "dist": ("pywebview",), "required": False,
      "why": "单窗口界面（WebView2；缺了退回浏览器）"},
+    # mcp 只按发行包版本检查：仓库根的 click.py 会遮蔽真 click，`import mcp` 在仓库根
+    # 直接炸（mcp → uvicorn → click）。mcp_server.py 导入前会把仓库根移出 sys.path。
+    {"imports": (), "dist": ("mcp",), "metadata_only": True,
+     "required": False, "why": "MCP server（mcp_server.py）；缺了只是 MCP 不可用"},
 )
 
 _PIN_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;]+)")
@@ -405,6 +409,26 @@ def _client_mapping_items(config) -> list[dict]:
             "盒子面板是固定像素的独立窗口，炉石窗口太小会把它挤出屏幕："
             "请把窗口调大（客户区至少 960×540）。", True, purpose))
 
+    # 窗口化时的尺寸口径：**统一 1920×1080**（与代码里的坐标基准一致）。
+    # 只提示不拦：别的 16:9 尺寸靠等比换算也能跑，但盒子面板是固定像素的
+    # 独立窗口，窗口越小越容易被挤出屏幕；换尺寸后校准框也更容易看着"偏"。
+    if display_mapping.window_mode(mapping.hwnd) == "windowed":
+        reference = display_mapping.REFERENCE_CLIENT
+        if (mapping.width, mapping.height) == tuple(reference):
+            items.append(_item(
+                "client-windowed", "窗口化尺寸", STATUS_OK,
+                f"窗口化 {mapping.width}×{mapping.height}", "",
+                False, "窗口化时的客户区尺寸口径"))
+        else:
+            items.append(_item(
+                "client-windowed", "窗口化尺寸", STATUS_WARN,
+                f"窗口化 {mapping.width}×{mapping.height}"
+                f"（基准 {reference[0]}×{reference[1]}）",
+                "把炉石窗口设成 1920×1080（选项 → 图形 → 分辨率；窗口化就行，不必全屏），"
+                "改完打开校准窗口拖一次保存。其它尺寸靠等比换算也能跑，但盒子面板是"
+                "固定像素的独立窗口，窗口越小越容易被挤出屏幕；尺寸与基准一致时，"
+                "校准框与卡牌点击的容错也最大。", False, "窗口化时的客户区尺寸口径"))
+
     try:
         from get_screen import get_HS_hwnd, is_allowed_hearthstone_foreground
         hwnd = int(get_HS_hwnd())
@@ -434,7 +458,7 @@ def environment_items(config=None) -> list[dict]:
 
     expected_dpi = _expected_dpi(config)
     dpi = _current_dpi()
-    purpose = "缩放不是 100% 时物理像素与逻辑像素会分裂"
+    purpose = "缩放不影响识别与点击：坐标按物理像素换算"
     if dpi == 0:
         scaling = _item("dpi", "显示缩放（DPI）", STATUS_WARN, "读取失败", "",
                         False, purpose)
@@ -442,12 +466,14 @@ def environment_items(config=None) -> list[dict]:
         scaling = _item("dpi", "显示缩放（DPI）", STATUS_OK,
                         f"{dpi}（{round(dpi / 96 * 100)}%）", "", False, purpose)
     else:
-        # 不再当致命错误：换算是按物理像素做的，这里只提醒可能引起坐标分裂。
+        # 非 100% 缩放**不影响运行**（坐标按物理像素换算，进程已声明 DPI 感知），
+        # 这里只把真实值报出来备查，不再劝用户改成 100%。
         scaling = _item(
             "dpi", "显示缩放（DPI）", STATUS_WARN,
-            f"{dpi}（{round(dpi / 96 * 100)}%，建议 100%）",
-            "显示设置 → 缩放建议改成 100%：不是 100% 时物理像素与逻辑像素会分裂，"
-            "截图与点击可能对不上。", False, purpose)
+            f"{dpi}（{round(dpi / 96 * 100)}%）",
+            "不需要改：缩放不影响识别与点击（进程已声明 DPI 感知，坐标按物理"
+            "像素换算）。只有在跟旧截图/教程里的像素值对照时才注意这不是 100%。",
+            False, purpose)
 
     return ([admin] + _client_mapping_items(config) + [scaling]
             + [_hearthstone_item(), _log_dir_item(), _ocr_model_item()])

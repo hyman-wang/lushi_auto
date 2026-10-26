@@ -4,6 +4,7 @@
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import selfcheck
 
@@ -47,6 +48,8 @@ class DependencyManifestTests(unittest.TestCase):
     def test_requirements_pins_are_parsed(self):
         pins = selfcheck._requirements_pins()
 
+        self.assertEqual("3.10.0", pins["rapidocr"])
+        self.assertEqual("1.31.0", pins["onnxruntime"])
         self.assertEqual("2.5.2", pins["numpy"])
 
     def test_manifest_covers_every_requirement(self):
@@ -69,7 +72,7 @@ class DependencyManifestTests(unittest.TestCase):
         keys = {selfcheck._normalize(spec["dist"][0])
                 for spec in selfcheck.DEPENDENCIES}
 
-        for expected in ("pywin32", "numpy",
+        for expected in ("rapidocr", "onnxruntime", "pywin32", "numpy",
                          "opencv-python-headless", "pillow", "pynput",
                          "keyboard", "psutil", "requests"):
             self.assertIn(expected, keys)
@@ -83,14 +86,14 @@ class DependencyManifestTests(unittest.TestCase):
 class DependencyItemTests(unittest.TestCase):
     def test_missing_package_fails_with_pip_hint(self):
         def importer(name):
-            if name == "psutil":
-                raise ImportError("No module named 'psutil'")
+            if name == "rapidocr":
+                raise ImportError("No module named 'rapidocr'")
             return object()
 
         items = selfcheck.dependency_items(importer=importer,
                                           version_reader=lambda dists: "1.0",
                                           pins={})
-        item = next(i for i in items if i["key"] == "psutil")
+        item = next(i for i in items if i["key"] == "rapidocr")
 
         self.assertEqual(selfcheck.STATUS_FAIL, item["status"])
         self.assertIn("ImportError", item["detail"])
@@ -193,6 +196,40 @@ class RunChecksTests(unittest.TestCase):
         self.assertIn("提示", result["summary"])
 
 
+class WindowedClientSizeTests(unittest.TestCase):
+    """窗口化时客户区必须是 1920×1080（只提示，不拦）。"""
+
+    def _items(self, width, height, mode):
+        import display_mapping
+
+        mapping = display_mapping.DisplayMapping(
+            hwnd=1, client=(0, 0, width, height), screen_left=0, screen_top=0)
+        with patch.object(display_mapping, "display_mapping",
+                          return_value=mapping), \
+                patch.object(display_mapping, "window_mode", return_value=mode):
+            items = selfcheck._client_mapping_items(None)
+        return {item["key"]: item for item in items}
+
+    def test_windowed_at_1920x1080_is_ok(self):
+        items = self._items(1920, 1080, "windowed")
+
+        self.assertEqual(selfcheck.STATUS_OK, items["client-windowed"]["status"])
+
+    def test_windowed_at_other_size_warns_without_blocking(self):
+        items = self._items(1600, 900, "windowed")
+        item = items["client-windowed"]
+
+        self.assertEqual(selfcheck.STATUS_WARN, item["status"])
+        self.assertFalse(item["required"], "只是口径建议，不该拦运行")
+        self.assertIn("1920×1080", item["hint"])
+        self.assertIn("1600×900", item["detail"])
+
+    def test_fullscreen_has_no_size_item(self):
+        items = self._items(1600, 900, "fullscreen")
+
+        self.assertNotIn("client-windowed", items)
+
+
 class RealEnvironmentTests(unittest.TestCase):
     """真跑一遍自检：确认依赖确实能 import，且解释器是 3.12。"""
 
@@ -209,7 +246,7 @@ class RealEnvironmentTests(unittest.TestCase):
     def test_all_declared_dependencies_are_importable(self):
         failing = [i["label"] for i in self.result["items"]
                    if i["key"] in {"pywin32", "opencv-python-headless", "numpy",
-                                   "pillow"}
+                                   "pillow", "rapidocr", "onnxruntime"}
                    and i["status"] == selfcheck.STATUS_FAIL]
 
         self.assertEqual([], failing)

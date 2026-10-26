@@ -13,11 +13,11 @@
     ❌ fail  必需项缺失/不满足，脚本很可能跑不起来或点了没反应，必须修。
 
 为什么死磕 Python 3.12：本项目全部实测环境都是 3.12.14（Windows 64 位），
-截图/模板匹配依赖也是在这个版本上验证的；3.13+ 未在实测
+OCR 依赖（RapidOCR + ONNX Runtime）也是在这个版本上验证的；3.13+ 未在实测
 范围内，3.11 及以下与验证环境不一致，容易出玄学问题。所以这里把
 「3.12 + 64 位」作为唯一推荐值，其它版本一律 ❌ 并给出安装提示。
 
-本模块只依赖标准库，导入它本身不会拉起 numpy 之类的重依赖
+本模块只依赖标准库，导入它本身不会拉起 numpy/OCR 之类的重依赖
 （缺依赖时更要能跑起来报错，否则自检就成了「没装依赖就跑不了自检」）。
 """
 from __future__ import annotations
@@ -46,7 +46,7 @@ EXPECTED_PYTHON = (3, 12)
 PYTHON_HINT = (
     "请装 Python 3.12（64 位）：conda create -n HTL python=3.12 -y && "
     "conda activate HTL，再执行 pip install -r requirements.txt。"
-    "不要用 3.11 及以下，也不要用 3.13 及以上（依赖没有对应轮子）。")
+    "不要用 3.11 及以下，也不要用 3.13 及以上（OCR 依赖没有对应轮子）。")
 
 # ---------------------------------------------------------------- 依赖清单
 # 每项：imports=代码里真正 import 的名字；dist=PyPI 发行包名（可多个候选）；
@@ -56,15 +56,23 @@ DEPENDENCIES: tuple[dict, ...] = (
     {"imports": ("win32gui", "win32api", "win32ui", "pywintypes"),
      "dist": ("pywin32",), "why": "炉石窗口句柄 / 全屏截图 / 系统分辨率"},
     {"imports": ("cv2",), "dist": ("opencv-python-headless", "opencv-python"),
-     "why": "截图裁剪、颜色判定"},
+     "why": "截图裁剪、颜色判定、OCR 预处理"},
     {"imports": ("numpy",), "dist": ("numpy",), "why": "截图像素解析"},
     {"imports": ("PIL",), "dist": ("Pillow",), "why": "截图（ImageGrab）"},
+    {"imports": ("rapidocr",), "dist": ("rapidocr",),
+     "why": "盒子面板文字识别（PP-OCRv6 small）"},
+    {"imports": ("onnxruntime",), "dist": ("onnxruntime",),
+     "why": "OCR 推理后端（ONNX Runtime CPU）"},
     {"imports": ("psutil",), "dist": ("psutil",), "why": "炉石进程存活检测"},
     {"imports": ("keyboard",), "dist": ("keyboard",), "why": "Ctrl+Q 全局热键"},
     {"imports": ("pynput",), "dist": ("pynput",), "why": "鼠标移动与点击"},
     {"imports": ("requests",), "dist": ("Requests",), "why": "卡牌数据下载"},
     {"imports": ("webview",), "dist": ("pywebview",), "required": False,
      "why": "单窗口界面（WebView2；缺了退回浏览器）"},
+    # mcp 只按发行包版本检查：仓库根的 click.py 会遮蔽真 click，`import mcp` 在仓库根
+    # 直接炸（mcp → uvicorn → click）。mcp_server.py 导入前会把仓库根移出 sys.path。
+    {"imports": (), "dist": ("mcp",), "metadata_only": True,
+     "required": False, "why": "MCP server（mcp_server.py）；缺了只是 MCP 不可用"},
 )
 
 _PIN_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;]+)")
@@ -136,7 +144,7 @@ def python_item(version: Optional[tuple] = None,
         return _item("python", label, STATUS_FAIL, detail, PYTHON_HINT)
     if int(bits) != 64:
         return _item("python", label, STATUS_FAIL, detail,
-                     "32 位 Python 装不上部分依赖（pywin32/opencv 等没有 32 位轮子），"
+                     "32 位 Python 装不上 OCR 依赖（onnxruntime 没有 32 位轮子），"
                      "请改装 64 位 Python 3.12。")
     return _item("python", label, STATUS_OK, detail)
 
@@ -277,6 +285,27 @@ def _load_ui_config() -> dict:
         return {}
 
 
+def _ocr_model_item() -> dict:
+    """RapidOCR 内置模型检查（wheel 自带 PP-OCRv6 small，缺了只需重装）。"""
+    purpose = "盒子面板文字识别用的 PP-OCRv6 small 模型"
+    try:
+        import rapidocr
+        root = Path(rapidocr.__file__).resolve().parent / "models"
+    except Exception as exc:
+        return _item("ocr-model", "OCR 模型", STATUS_WARN,
+                     f"无法定位 RapidOCR 内置模型：{type(exc).__name__}",
+                     "先安装 rapidocr（wheel 自带模型）。", False, purpose)
+    expected = ("PP-OCRv6_det_small.onnx", "PP-OCRv6_rec_small.onnx")
+    missing = [name for name in expected if not (root / name).is_file()]
+    if missing:
+        return _item("ocr-model", "OCR 模型", STATUS_WARN,
+                     f"缺少 {len(missing)} 个：{', '.join(missing)}",
+                     "重新安装 rapidocr（模型随 wheel 分发）。", False, purpose)
+    return _item("ocr-model", "OCR 模型", STATUS_OK,
+                 f"RapidOCR 内置 PP-OCRv6 small（{len(expected)} 个模型）",
+                 "", False, purpose)
+
+
 def _log_dir_item() -> dict:
     """炉石日志目录 + Power.log（脚本靠它判断回合，必须有）。"""
     purpose = "判断回合/出牌的依据（Power.log）"
@@ -380,13 +409,33 @@ def _client_mapping_items(config) -> list[dict]:
             "盒子面板是固定像素的独立窗口，炉石窗口太小会把它挤出屏幕："
             "请把窗口调大（客户区至少 960×540）。", True, purpose))
 
+    # 窗口化时的尺寸口径：**统一 1920×1080**（与代码里的坐标基准一致）。
+    # 只提示不拦：别的 16:9 尺寸靠等比换算也能跑，但盒子面板是固定像素的
+    # 独立窗口，窗口越小越容易被挤出屏幕；换尺寸后校准框也更容易看着"偏"。
+    if display_mapping.window_mode(mapping.hwnd) == "windowed":
+        reference = display_mapping.REFERENCE_CLIENT
+        if (mapping.width, mapping.height) == tuple(reference):
+            items.append(_item(
+                "client-windowed", "窗口化尺寸", STATUS_OK,
+                f"窗口化 {mapping.width}×{mapping.height}", "",
+                False, "窗口化时的客户区尺寸口径"))
+        else:
+            items.append(_item(
+                "client-windowed", "窗口化尺寸", STATUS_WARN,
+                f"窗口化 {mapping.width}×{mapping.height}"
+                f"（基准 {reference[0]}×{reference[1]}）",
+                "把炉石窗口设成 1920×1080（选项 → 图形 → 分辨率；窗口化就行，不必全屏），"
+                "改完打开校准窗口拖一次保存。其它尺寸靠等比换算也能跑，但盒子面板是"
+                "固定像素的独立窗口，窗口越小越容易被挤出屏幕；尺寸与基准一致时，"
+                "校准框与卡牌点击的容错也最大。", False, "窗口化时的客户区尺寸口径"))
+
     try:
         from get_screen import get_HS_hwnd, is_allowed_hearthstone_foreground
         hwnd = int(get_HS_hwnd())
         if hwnd and not is_allowed_hearthstone_foreground(hwnd):
             items.append(_item(
                 "foreground", "炉石窗口在前台", STATUS_WARN, "被其它窗口遮挡",
-                "坐标换算与遮挡无关，仍会点对位置；但截图会拍到遮挡窗口，"
+                "坐标换算与遮挡无关，仍会点对位置；但截图/OCR 会拍到遮挡窗口，"
                 "运行时请把炉石留在最前面。", False, "截图区域是否拍到炉石画面"))
     except Exception:
         pass
@@ -409,7 +458,7 @@ def environment_items(config=None) -> list[dict]:
 
     expected_dpi = _expected_dpi(config)
     dpi = _current_dpi()
-    purpose = "缩放不是 100% 时物理像素与逻辑像素会分裂"
+    purpose = "缩放不影响识别与点击：坐标按物理像素换算"
     if dpi == 0:
         scaling = _item("dpi", "显示缩放（DPI）", STATUS_WARN, "读取失败", "",
                         False, purpose)
@@ -417,15 +466,17 @@ def environment_items(config=None) -> list[dict]:
         scaling = _item("dpi", "显示缩放（DPI）", STATUS_OK,
                         f"{dpi}（{round(dpi / 96 * 100)}%）", "", False, purpose)
     else:
-        # 不再当致命错误：换算是按物理像素做的，这里只提醒可能引起坐标分裂。
+        # 非 100% 缩放**不影响运行**（坐标按物理像素换算，进程已声明 DPI 感知），
+        # 这里只把真实值报出来备查，不再劝用户改成 100%。
         scaling = _item(
             "dpi", "显示缩放（DPI）", STATUS_WARN,
-            f"{dpi}（{round(dpi / 96 * 100)}%，建议 100%）",
-            "显示设置 → 缩放建议改成 100%：不是 100% 时物理像素与逻辑像素会分裂，"
-            "截图与点击可能对不上。", False, purpose)
+            f"{dpi}（{round(dpi / 96 * 100)}%）",
+            "不需要改：缩放不影响识别与点击（进程已声明 DPI 感知，坐标按物理"
+            "像素换算）。只有在跟旧截图/教程里的像素值对照时才注意这不是 100%。",
+            False, purpose)
 
     return ([admin] + _client_mapping_items(config) + [scaling]
-            + [_hearthstone_item(), _log_dir_item()])
+            + [_hearthstone_item(), _log_dir_item(), _ocr_model_item()])
 
 
 # ---------------------------------------------------------------- 总入口

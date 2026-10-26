@@ -16,12 +16,14 @@ from manual_controller import (
 )
 from src.flow.recommendation_flow import FlowStepStatus, RecommendationFlow
 from src.game_state.recommendation_adapter import adapt_action
-from tests.support.recommendation_parser import (
+from src.parser.recommendation_parser import (
     RecommendationParseError,
     RecommendationParser,
 )
 from src.recommendation_models import (
     ActionKind,
+    FrameEvidence,
+    OcrEvidence,
 )
 from src.safety.recommendation_validator import RecommendationValidator
 
@@ -225,28 +227,80 @@ class RecordingController:
         return ActionExecutionResult(True, "executed")
 
 
-class TimelineFlowTests(unittest.TestCase):
-    def _step(self, action_name, *, bump_after=None):
-        from src.recommendation.mapper import payload_to_action
-        from tests.support.recommendation_stubs import FakeSource, payload
+class PinnedTimelineHarness:
+    """Frames/reads 一直钉在同一句指令上，面板永不自行变化。
 
+    这样流程只由 _verify_result 的时间线分支决定结果，不受 OCR 漂移干扰。
+    """
+
+    def __init__(self, instruction):
+        self.instruction = instruction
+        self._frame_no = 0
+
+    def _frame(self, frame_id):
+        return FrameEvidence(
+            frame_id=frame_id,
+            captured_at=0.0,
+            desktop_size=(1920, 1080),
+            dpi=96,
+            window_handle=1,
+            foreground=True,
+            recommendation_roi=(7, 32, 278, 970),
+            exact_hash="same",
+            perceptual_hash="0" * 64,
+            panel_visible=True,
+        )
+
+    def capture(self, ocr_panel_ok=False):
+        self._frame_no += 1
+        return self._frame(f"f{self._frame_no}")
+
+    @staticmethod
+    def crop_recommendation(current_frame):
+        return current_frame
+
+    def read(self, frame_supplier, _roi_supplier):
+        current_frame = frame_supplier()
+        return self._evidence(current_frame.frame_id)
+
+    def read_frame(self, current_frame, _roi_supplier):
+        return self._evidence(current_frame.frame_id)
+
+    def _evidence(self, frame_id):
+        return OcrEvidence(
+            frame_id=frame_id,
+            created_at=0.0,
+            lines=(),
+            normalized_text=self.instruction,
+            confidence=0.90,
+            backend="test",
+            preprocessing="test",
+        )
+
+
+class TimelineFlowTests(unittest.TestCase):
+    def _step(self, instruction):
         active = SimpleNamespace(
             is_my_turn=True, game_num_turns_in_play=3, hand_entry_count=0)
+        harness = PinnedTimelineHarness(instruction)
+        # 每次调用都要返回一个 (state, revision) 二元组；不能用生成器函数
+        # （flow 每步会多次 state_supplier()，生成器会被解包错）。
+        state_supplier = lambda: (active, 10)
+
         controller = RecordingController()
-        source = FakeSource(payload(action_name), bump_after=bump_after)
         flow = RecommendationFlow(
-            source=source,
-            mapper=payload_to_action,
-            state_supplier=lambda: (active, 10),
+            capture=harness,
+            reader=harness,
+            parser=RecommendationParser(),
+            state_supplier=state_supplier,
             adapter=adapt_action,
             validator=RecommendationValidator(),
             controller=controller,
-            result_timeout=0.0,
         )
-        return flow, controller, source
+        return flow, controller
 
     def test_unchanged_panel_waits_instead_of_retrying(self):
-        flow, controller, _source = self._step("timeline_undo")
+        flow, controller = self._step("回溯")
 
         result = flow.run_player_turn_step()
 
@@ -254,46 +308,57 @@ class TimelineFlowTests(unittest.TestCase):
         # 应标记已消费并等待盒子更新下一条推荐。
         self.assertEqual(FlowStepStatus.OBSERVE, result.status)
         self.assertIn("waiting_recommendation_update", result.diagnostics)
-        self.assertEqual([TimelineAction("undo")], controller.actions)
+        self.assertEqual(
+            [TimelineAction("undo")], controller.actions)
 
     def test_identical_recommendation_is_not_executed_twice(self):
-        flow, controller, _source = self._step("timeline_undo")
-
+        flow, controller = self._step("回溯")
         first = flow.run_player_turn_step()
+        self.assertEqual(FlowStepStatus.OBSERVE, first.status)
+
         second = flow.run_player_turn_step()
 
-        # 同一条推送只点一次；第二次直接等待盒子更新。
-        self.assertEqual(FlowStepStatus.OBSERVE, first.status)
-        self.assertEqual(FlowStepStatus.OBSERVE, second.status)
-        self.assertIn("waiting_recommendation_update", second.diagnostics)
+        # 同一指令、同一 turn/rev：已被消费去重，RETRY 而非再次点击。
+        self.assertEqual(FlowStepStatus.RETRY, second.status)
         self.assertEqual([TimelineAction("undo")], controller.actions)
 
     def test_keep_choice_also_waits_after_single_click(self):
-        flow, controller, _source = self._step("timeline_keep")
+        flow, controller = self._step("维持")
 
         result = flow.run_player_turn_step()
 
         self.assertEqual(FlowStepStatus.OBSERVE, result.status)
         self.assertIn("waiting_recommendation_update", result.diagnostics)
+        self.assertEqual(
+            [TimelineAction("keep")], controller.actions)
+
+    def test_pending_play_line_with_keep_only_clicks_keep_once(self):
+        # 面板「打出…还挂着 + 维持」：打出上一步已消费，本次只点一次维持，
+        # 不重打、也不因文字再次变化而重复点击。
+        flow, controller = self._step("打出1号位随从\n维持")
+
+        result = flow.run_player_turn_step()
+
+        self.assertEqual(FlowStepStatus.OBSERVE, result.status)
         self.assertEqual([TimelineAction("keep")], controller.actions)
 
-    def test_undo_then_keep_each_execute_once(self):
-        flow, controller, source = self._step("timeline_undo", bump_after=2)
-
-        first = flow.run_player_turn_step()
-        source.push(payload_for_keep())
         second = flow.run_player_turn_step()
+        self.assertEqual(FlowStepStatus.RETRY, second.status)
+        self.assertEqual([TimelineAction("keep")], controller.actions)
 
-        self.assertEqual(FlowStepStatus.EXECUTED, first.status)
-        self.assertEqual(FlowStepStatus.OBSERVE, second.status)
-        self.assertEqual(
-            [TimelineAction("undo"), TimelineAction("keep")],
-            controller.actions)
+    def test_pending_discover_line_with_undo_only_clicks_undo_once(self):
+        # 战吼手牌目标选完后，「选择我方2号位卡牌」仍挂在面板上并追加
+        # 「回溯时间线」：只点一次回溯，不因文字未变而重复撤销。
+        flow, controller = self._step("选择我方2号位卡牌\n回溯时间线")
 
+        result = flow.run_player_turn_step()
 
-def payload_for_keep():
-    from tests.support.recommendation_stubs import payload
-    return payload("timeline_keep")
+        self.assertEqual(FlowStepStatus.OBSERVE, result.status)
+        self.assertEqual([TimelineAction("undo")], controller.actions)
+
+        second = flow.run_player_turn_step()
+        self.assertEqual(FlowStepStatus.RETRY, second.status)
+        self.assertEqual([TimelineAction("undo")], controller.actions)
 
 
 if __name__ == "__main__":

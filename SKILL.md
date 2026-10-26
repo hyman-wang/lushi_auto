@@ -28,6 +28,8 @@ description: 用 hsctl 命令行实时控制炉石传说自动化脚本（HSLege
    直接 `python hsctl.py --json screenshot --kind client --max-width 1280`，读返回的 PNG，
    然后**在回复里直接把这张图展示出来**。不要用文字去描述画面代替图，不要反问"要哪一档"
    （默认 `client` 就对），不要先 `status`/`log` 铺垫，也不要附上一段战况分析。
+9. **提交代码前先读 [`docs/GIT.md`](docs/GIT.md)**：一个功能一个提交、不 `git add -A`、
+   不擅自 push；`ui_config.json` / 日志 / 截图等本机产物不要入库。
    最多一行说明（档位 + 是否退化为整屏 + 时间）。详见 §7「实时画面」。
    只有图**不能**反映用户想问的东西时（例如他没在跑、图退化成桌面）才追加解释。
    这是铁律 1「先探活」的唯一例外 —— 抓图本身只读且会自查，连不上会返回退出码 3。
@@ -78,8 +80,8 @@ python hsctl.py --json status
 | --- | --- |
 | `running` / `phase` | 是否在跑；`phase`: idle / waiting / playing / stopping / finished |
 | `is_admin` | `false` → 提醒用户用管理员权限 |
-| `name_match.matched` | `false` → 盒子登录的不是当前战网账号；在盒子里重新登录即可自动跟进（`config set --name` 仅作兜底） |
-| `config.name` / `config.log_root` | `name` 自动从盒子首页读取；`log_root` 必须填，否则 `start` 会被拒 |
+| `name_match.matched` | `false` → 账号不匹配，用 `config set --name "昵称#编号"` 修 |
+| `config.name` / `config.log_root` | 两项都不能空，否则 `start` 会被拒 |
 | `overlay_running` / `prepared` | 浮窗是否开着、是否已「就绪」 |
 | `stop_after_game` | `true` 表示已请求「本局结束后停止」 |
 | `games` / `wins` / `win_rate` | 战绩 |
@@ -98,7 +100,7 @@ python hsctl.py serve task-status
 #   任务不在 → python hsctl.py serve install-task          （非管理员会打印一条命令给用户）
 
 # ③ 修配置（只在需要时）
-python hsctl.py config set --log-root "D:\Hearthstone\Logs"
+python hsctl.py config set --name "Player#12345" --log-root "D:\Hearthstone\Logs"
 
 # ④ 准备（开浮窗 + 切炉石前台，不开打）
 python hsctl.py prepare
@@ -130,7 +132,7 @@ python hsctl.py stop                  # 立即停
 | 6 | 开打 | `start` |
 
 ```powershell
-Start-Process 'D:\炉石传说盒子\HSAng.exe' -ArgumentList '--remote-debugging-port=9222' -Verb RunAs  # ① 盒子（一般由 hsctl prepare 自动带参数启动，这行是手动兜底）
+Start-Process 'D:\炉石传说盒子\HSAng.exe'    # ① 盒子（进程名 HSAng.exe）
 python hsctl.py serve start --via-task        # ② 控制台：提权、不弹 UAC
 python hsctl.py restart-hearthstone --yes     # ③ 战网启动器 → 炉石
 python hsctl.py enter-battle --deck 8         # ④ 认界面：点「传统对战」→ 选第 8 副卡组
@@ -173,6 +175,7 @@ Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Un
 
 ```bash
 # 自诊 / 环境（**会话第一条命令就是 doctor**）
+python hsctl.py --version               # 版本号（v1.3.25），回报里带上便于对账
 python hsctl.py --json doctor           # 环境 + 控制台 + 下一步（verdict / next_steps）
 python hsctl.py env                     # 当前 / 已保存的解释器
 python hsctl.py env --discover          # 列出本机候选解释器 + 各自缺什么（不写盘）
@@ -194,16 +197,15 @@ python hsctl.py ui --learn              # 站到对应界面时重裁识别模�
 python hsctl.py enter-battle --deck 8   # 默认停在选择套牌界面（不点「开始」）
 python hsctl.py enter-battle --deck 8 --start   # 连「开始」一起点（等于开始排队）
 python hsctl.py deck-click 8            # 快速选卡组：直接点第 8 格（秒级，不走状态机）
-                                        # 前提：当前已在选牌界面；那一格不像卡组就不点
-python hsctl.py deck                    # 看自动选择的卡组序号
-python hsctl.py deck 8                  # 每局自动选第 8 副；hsctl deck --clear 关掉
+                                        # 前提：当前已在选牌界面、自动化未运行；那一格不像卡组就不点
+python hsctl.py deck --clear            # 清掉旧的「自动选卡组」设置（自动选卡组已停用）
 
 # 切换对战模式（手动、同步约 2-3 秒：点右上角开模式菜单 → 点对应模式）
 python hsctl.py mode wild               # wild | standard | casual（或 狂野/标准/休闲）
                                         # 前提：停在选择套牌界面、自动化未运行（详见下文）
 
 # 待做命令队列：一次提交多条，控制台后台按顺序执行（断线不影响，可查可取消）
-python hsctl.py queue run "stop mode=after_game" "wait-stopped" "mode wild" "deck 1" "start"
+python hsctl.py queue run "stop mode=after_game" "wait-stopped" "mode wild" "deck-click 1" "start"
 python hsctl.py queue status            # 看每步进度（pending/running/ok/failed/skipped）
 python hsctl.py queue cancel            # 取消（当前步跑完后停止）
 #   支持的动作：stop [mode=after_game] / wait-stopped [timeout=秒] / deck 序号 /
@@ -224,10 +226,16 @@ python hsctl.py liveness set --enabled --warn 120 --stop 300
 python hsctl.py watchdog on                      # 中断重启：日志停滞 5 分钟就重启炉石并重开
 python hsctl.py watchdog set --stale 300 --max-restarts 3 --window 600
 python hsctl.py concede set --enabled --threshold 12 --rounds 4
+# 卡组识别投降（只判对方）：认出对面是哪套卡组就投；规则是「特征牌 + 与/或/非」树
+python hsctl.py surrender                        # 看配置（条件译成中文）
+python hsctl.py surrender on|off                 # 总开关（保留卡组）
+python hsctl.py surrender check                  # 这一局对方职业 + 每个条件是否满足
+python hsctl.py surrender set --file rules.json  # 存规则；当场会命中时要加 --yes
+python hsctl.py card 神秘访客                     # 查卡名（本地，不联网）
 python hsctl.py rank-stop set --enabled --mode legend_number --legend-number 500 --action stop
 # 控分：名次数值 < 500（名次比目标更靠前）就开局投降，压到 >= 500 再正常打
 python hsctl.py rank-stop set --enabled --mode legend_number --legend-number 500 --action keep
-python hsctl.py config set --log-root "D:\Hearthstone\Logs"   # 昵称自动从盒子读取
+python hsctl.py config set --name "昵称#编号"
 
 # 浮窗 / 校准 / 定时
 python hsctl.py overlay on|off|toggle
@@ -254,7 +262,16 @@ python hsctl.py serve stop --hard                # 跳过自停，直接结束�
 
 所有命令都接受 `--json`（放命令前或后都行）、`--port`、`--host`、`--timeout`。
 
-### 4.1 切换对战模式（`hsctl mode`）注意
+### 4.1 窗口尺寸口径（自检会提示）
+
+- **炉石窗口设成 1920×1080 即可：窗口化就行，不必全屏**（选项 → 图形 → 分辨率），改完打开校准窗口拖一次保存。别用「最大化窗口」（客户区不是 1920×1080）。
+- 「🧪 环境自检」里的 `client-windowed` 项：窗口化且尺寸 ≠ 1920×1080 时是 ⚠️（`required=False`，
+  **不拦运行**）；全屏时该项根本不出现。判定用窗口样式 `WS_CAPTION`（有标题栏=窗口化），
+  不看尺寸——最大化/换屏都不会误判。
+- 用户抱怨「点击偏、法术指向一直重试」时，先问是不是窗口化且尺寸不是 1920×1080，
+  再查校准。
+
+### 4.2 切换对战模式（`hsctl mode`）注意
 
 - **前提**：画面停在「选择套牌」界面（右上角模式按钮可见）、自动化未运行。
   自动化 / 「进入对战」/ 命令队列任一在跑都会被拒绝（退出码 1，读 `error` 即知原因）。
@@ -273,7 +290,32 @@ python hsctl.py serve stop --hard                # 跳过自停，直接结束�
   按 S 保存 —— **ROI 不是热开关**：保存后要在下次「开始对战」时读取一次才生效
   （`fsm.init()` 重建 `RecommendationConfig`），不用重启脚本进程。
 - 典型场景：上传说后换模式继续——
-  `python hsctl.py queue run "stop mode=after_game" "wait-stopped" "mode wild" "deck 2" "start"`。
+  `python hsctl.py queue run "stop mode=after_game" "wait-stopped" "mode wild" "deck-click 2" "start"`。
+
+### 4.3 卡组识别投降规则（`surrender`）
+
+**只判对方**：对方打出 / 出现过 / 开局生效的卡才算数，自己的牌永远不算。
+命中任意一套 → 立刻认输（不需要等自己回合）。
+
+```json
+{"enabled": true, "decks": [{
+  "id": "priest_alizana", "name": "牧师 · 阿扎莉娜 + 神秘访客", "class": "牧师",
+  "when": {"all": [
+    {"type": "start_of_game", "card": "裂魂者阿扎莉娜"},
+    {"type": "played", "card": "神秘访客", "within": {"max": 4}}
+  ]}}]}
+```
+
+- 节点：`all`（与）/ `any`（或）/ `not`（非），**可任意层嵌套**（`A 且（B 或 C）` =
+  `{"all":[A, {"any":[B, C]}]}`；深度 ≤8、每套 ≤64 条）；条件类型：`played` /
+  `revealed`（别名 `seen`）/ `start_of_game` / `played_or_revealed` / `in_zone` / `turn`
+- 其它字段：`card`（中文名或 id，数组=任一）、`card_type`、`side`（默认 `opponent`）、
+  `at_least/at_most`（可同时写，表示 N~M 张）、`within`（`{"min":1,"max":4}`）；
+  `class` 可写可不写
+- 卡名写中文即可，错字会自动纠正；校验失败**一律不写盘**（保留上一份能用的）
+- 运行中热保存：若这份规则**当场就能命中**会返回 `needs_confirm`，CLI 加 `--yes` 才存
+- 调规则时先 `python hsctl.py surrender check`：它列出对方职业 + 条件树（`且/或/非`
+  缩进，✓/× 按真实表达式算）；网页状态栏同源，另每套卡组可单独收起
 
 ## 5. 改参数前必须知道的生效时机
 
@@ -283,11 +325,13 @@ python hsctl.py serve stop --hard                # 跳过自停，直接结束�
 | --- | --- |
 | 立即生效 | `mulligan_ready_delay_seconds`、`mulligan_retry_delay_seconds`、`pre_action_delay_seconds`、`first_turn_per_card_delay_seconds`、`discover_target_delay_seconds` |
 | 下次「开始对战」生效 | `mulligan_post_ocr_delay_seconds`、`post_action_delay_seconds`、`draw_extra_delay_per_card_seconds` |
+| **需重启脚本进程** | `ocr_preprocess_scale` |
 
 `hsctl delays set` 的回话里有 `effects` 字段直接告诉你每项的实际时机 —— **以此为准**，
 不要凭本表猜。活人感 / 存活检测 / 中断重启 / 自动投降 / 段位目标是每次读盘，改完立即生效。
 
-**卡组序号**（`hsctl deck 8`）也是每次开局前重读 —— 改完**下一局**生效，不用重启脚本。
+**自动选卡组已停用**：自动化不再每局按 `hsctl deck 8` 点卡组（会覆盖手选）。
+选卡组只用 `deck-click N`（自动化未运行时立即点）或 `enter-battle --deck N`（进对战时选）。
 
 ## 6. 常见拒绝与处理
 
@@ -296,7 +340,7 @@ python hsctl.py serve stop --hard                # 跳过自停，直接结束�
 | `自动化运行中，请先停止后再修改…` | 该命令没带 `hot`。参数类命令默认带；若你显式加了 `--no-hot`，去掉它 |
 | `自动化已经在运行中。` | 别重复 `start`；先看 `status` |
 | `当前没有正在运行的自动化。` | `stop` 没意义；先 `start` |
-| `还没从盒子读到战网昵称…` | 先打开并登录炉石盒子；盒子首页右上角就是当前昵称 |
+| `请先填写用户 ID / 炉石日志目录` | `config set` 补上 |
 | `日志目录不存在：…` | 路径写错了；用 `--log-root` 改对 |
 | `必须介于 a–b` | 数值越界，按提示范围改 |
 | `没找到正在运行的控制台` | 退出码 3：`serve start`，或让用户启动脚本 |
@@ -329,6 +373,10 @@ python hsctl.py ui --frame     # 它会告诉你 state / 两个匹配分，并�
 要重新对齐框：`python hsctl.py calibrate --target main_menu_battle`（直接停在那个框上）。
 校准窗口里拖这个框时，**顶部提示条会实时显示匹配分**（`框内文字匹配 1.00（阈值 0.80），对准了`），
 用的就是脚本运行时同一个判定函数 —— 显示 1.00 就是真的对上了，按 **S** 保存即可。
+
+> 用户报「按完开始鼠标好久不动」时，先 `hsctl log -n 50` 找 `[SYS] 进入对战 +x.xs：…`：
+> 停在「初始状态=…」= 界面识别/前台问题；停在「段位检测完成」= 段位 OCR 慢；
+> 这几行完全没有 = 自动化线程没起来（看 ERROR）。
 
 ## 7. 与用户沟通的要点
 
@@ -375,7 +423,7 @@ python hsctl.py --json screenshot --kind client --max-width 1280
 ```
 
 - `--kind client`（默认）= 炉石客户区，**含叠在上面的盒子面板** —— 这就是脚本操作的画面；
-- `--kind roi` = 盒子推荐面板截图（**已废弃**：推荐改读盒子推送的 JSON，不再 OCR；保留只为看画面）；
+- `--kind roi` = 盒子推荐面板，即 **OCR 的输入**：识别失败时对比日志里的 OCR 原文最直接；
 - `--kind full` = 整屏，用来看盒子/浮窗有没有被别的窗口挡住；
 - `--kind boxes` = 带校准区域框，用来判断校准是否还对齐。
 
@@ -442,7 +490,7 @@ python hsctl.py serve task-status      # 看有没有现成的「最高权限」
 
 ### 8.1 控制台跑在错误的 Python 上（自检"全部依赖 fail"）
 
-**症状**：`status` 里 `selfcheck.failed` 等于全部依赖数（pywin32/cv2/numpy/PIL/psutil…
+**症状**：`status` 里 `selfcheck.failed` 等于全部依赖数（pywin32/cv2/numpy/PIL/rapidocr/onnxruntime…
 一整排 `ModuleNotFoundError`），且 `selfcheck.executable` 指向的解释器版本不对
 （本项目要求 3.12，3.13+ 未在实测范围内）。
 
@@ -479,7 +527,36 @@ python hsctl.py --json doctor        # 复验：env_ok + console.is_admin=true
 且本机确实没有别的合格环境 —— 那就按 `doctor` 的 `env_no_valid_interpreter` 分支
 建环境（conda / venv）再 `env --pin`。
 
-## 9. 参考
+## 9. MCP（把 hsctl 当 MCP 工具用）
+
+如果客户端支持 MCP，可以不起命令行、直接调工具 —— `mcp_server.py` 把 hsctl 的
+常用子命令包成了 MCP tools（stdio）。**它只是 hsctl 的薄封装**，语义、退出码、
+`--json` 输出与命令行完全一致；`doctor` / `status` / `screenshot` 等工具返回的
+就是 hsctl 的 JSON。
+
+客户端配置（以 `D:\miniconda3\envs\HTL\python.exe` 为例）：
+
+```json
+{
+  "mcpServers": {
+    "hsctl": {
+      "command": "D:\\miniconda3\\envs\\HTL\\python.exe",
+      "args": ["<仓库路径>\\mcp_server.py"]
+    }
+  }
+}
+```
+
+- `command` 的解释器必须装了 `mcp`（见 `requirements.txt`）；跑命令时 hsctl 会
+  自己再切到本机固定的 HTL 环境。
+- 工具：`doctor` `selfcheck` `status` `log` `ui` `screenshot` `start` `stop`
+  `resume` `prepare` `cancel` `enter_battle` `mode` `deck` `calibrate`
+  `restart_hearthstone`（需 `confirm=true`）`config_show/set` `delays_show/set`，
+  外加万能兜底 `hsctl(argv=[...])`（任意子命令，自动加 `--json`）。
+- `screenshot` 直接把 PNG 作为图片内容返回，不用再读文件。
+- 没装 MCP 的客户端照常用命令行；两者行为一致，不用二选一。
+
+## 10. 参考
 
 - **通用 agent 行为约定（跨项目）**：[`AGENTS.md`](AGENTS.md)
 - 完整命令参考：`docs/CLI.md`

@@ -77,6 +77,10 @@ DECK_GRID_REGION = (366, 210, 1089, 858)
 MAIN_MENU_BATTLE_COLOR = "#f0c04a"
 DECK_SELECT_TITLE_COLOR = "#e88ab0"
 DECK_GRID_COLOR = "#8fd3e8"
+# 换牌阶段专用的推荐面板区域：比回合推荐大，能框住最多 4 条留牌建议。
+# 必须与 config.RecommendationConfig.mulligan_recommendation_roi 的默认值一致。
+MULLIGAN_RECOMMENDATION_REGION = (7, 200, 278, 970)
+MULLIGAN_RECOMMENDATION_COLOR = "#b6e05a"
 # 文字框可以很薄：校准窗口的缩放手柄默认不允许小于 MIN_SIZE(60)，这里放行到 20，
 # 否则 259×27 的「传统对战」框根本拖不出来（只能改配置文件）。
 TEXT_BOX_MIN_SIZE = 20
@@ -145,15 +149,22 @@ CALIBRATION_TARGETS = (
     {"key": "recommendation", "config_key": "recommendation_roi",
      "label": "盒子推荐面板", "short": "推荐面板", "color": "#63c76f",
      "default": (7, 200, 202, 500),
-     "hint": "仅框位预览：推荐已改读盒子 JSON，不再截图识别"},
+     "hint": "把盒子的「打法参考A」面板框进绿框"},
+    {"key": "mulligan_recommendation",
+     "config_key": "mulligan_recommendation_roi",
+     "label": "换牌推荐面板（最多4张留牌）", "short": "换牌推荐",
+     "color": MULLIGAN_RECOMMENDATION_COLOR,
+     "default": MULLIGAN_RECOMMENDATION_REGION,
+     "hint": "框住换牌阶段的留牌建议（最多 4 条）：换牌 OCR 专用，"
+             "比回合推荐区域更大；回合推荐仍用上一项的小区域"},
     {"key": "mulligan_confirm", "config_key": "mulligan_confirm_roi",
      "label": "换牌「确认」按钮", "short": "换牌确认", "color": "#5fa8e6",
      "default": (860, 810, 1060, 890),
-     "hint": "仅框位预览：换牌不再检测「确认」按钮"},
+     "hint": "框住换牌界面里的「确认」按钮"},
     {"key": "win_rate", "config_key": "ai_win_rate_roi",
      "label": "盒子「AI胜率」浮动条", "short": "AI胜率", "color": "#e2a84e",
      "default": AI_WIN_RATE_REGION,
-     "hint": "仅框位预览：AI 胜率改读盒子推送"},
+     "hint": "框住左上角盒子的「AI胜率 X%」浮动条"},
     {"key": "post_game_start", "config_key": "post_game_start_roi",
      "label": "结算「开始」按钮", "short": "开始按钮", "color": "#7fd4c1",
      "default": POST_GAME_START_BUTTON_REGION,
@@ -161,7 +172,7 @@ CALIBRATION_TARGETS = (
     {"key": "rank", "config_key": "post_game_rank_roi",
      "label": "段位数字（名次）", "short": "段位", "color": RANK_COLOR,
      "default": POST_GAME_RANK_REGION,
-     "hint": "仅框位预览：名次改读盒子排行接口"},
+     "hint": "框住结算界面右上角的段位数字：有数字=已上传说，数字就是名次"},
     # 下面三个是「界面识别」用的（battle_entry）：认出界面才决定点什么。
     {"key": "main_menu_battle", "config_key": "main_menu_battle_roi",
      "label": "主界面「传统对战」（识别+点击）", "short": "传统对战",
@@ -314,26 +325,33 @@ def screenshot_regions(config=None) -> list[dict]:
     win_rate, win_rate_wide = ai_win_rate_boxes(cfg)
     return [
         {"key": "recommendation", "color": "#63c76f",
-         "label": "盒子推荐面板（仅预览）",
+         "label": "盒子推荐面板（OCR 识别来源）",
          "box": by_key["recommendation"]["box"],
          "config_key": "recommendation_roi",
-         "note": "推荐已改读盒子 JSON；这个框只用于框位预览/兼容旧配置"},
+         "note": "对战中把盒子的「打法参考A」面板拖进这个绿框，脚本就靠它读出牌建议"},
+        {"key": "mulligan_recommendation",
+         "color": MULLIGAN_RECOMMENDATION_COLOR,
+         "label": "换牌推荐面板（换牌 OCR 专用，最多4张留牌）",
+         "box": by_key["mulligan_recommendation"]["box"],
+         "config_key": "mulligan_recommendation_roi",
+         "note": "换牌阶段的留牌建议区域：比回合推荐大，能框住最多 4 条建议；"
+                 "与回合 OCR 分开截图以提速"},
         {"key": "mulligan_confirm", "color": "#5fa8e6",
          "label": "换牌「确认」按钮（提交校验）",
          "box": by_key["mulligan_confirm"]["box"],
          "config_key": "mulligan_confirm_roi",
-         "note": "仅框位预览：换牌不再检测「确认」按钮"},
+         "note": "换牌阶段用来确认按钮是否已经消失（还在=没提交成功，要重试）"},
         {"key": "win_rate", "color": "#e2a84e",
          "label": "盒子「AI胜率」浮动条",
          "box": win_rate,
          "config_key": "ai_win_rate_roi",
-         "note": "仅框位预览：AI 胜率改读盒子推送"},
+         "note": "开了自动投降才用得到：靠它读左上角 AI胜率"},
         {"key": "win_rate_wide", "color": "#e2705f",
          "label": "AI胜率兜底区域",
          "box": win_rate_wide,
          # 兜底区域完全包住主区域，所以画细一点、标签放框下面，避免和上面重叠。
          "width": 1, "label_below": True,
-         "note": "仅框位预览（兜底区域）"},
+         "note": "主区域读不到时放宽再读一次，偏一点也能兜住"},
         # 下面两个只在「对局结算」阶段使用（打完一局后的界面）：
         # 「开始」按钮与段位数字**都可校准**（段位框读用户校准值，用来读名次）。
         {"key": "post_game_start", "color": "#7fd4c1",
@@ -345,7 +363,8 @@ def screenshot_regions(config=None) -> list[dict]:
          "label": "段位数字（上传说后读取，用于按段位停止）",
          "box": by_key["rank"]["box"],
          "config_key": "post_game_rank_roi",
-         "note": "仅框位预览：名次改读盒子排行接口"},
+         "note": "每局结束读一次：有数字=已上传说（数字即名次），空白=还没上传说；"
+                 "读数偏了就把这个框拖到名次数字上"},
         # 下面三个是「界面识别」画出来的：认出界面才决定点什么，所以也要能一眼看到。
         {"key": "main_menu_battle", "color": MAIN_MENU_BATTLE_COLOR,
          "label": "主界面「传统对战」（认出它就点它）",
@@ -400,15 +419,11 @@ def _default_screen_metrics() -> tuple[int, int, int]:
 
 
 def _default_panel_detector(crop) -> bool:
-    """盒子面板可见性判定（暗红顶栏 + 像素方差）。"""
+    """复用 DesktopCapture 的面板可见性判定（暗红顶栏 + 像素方差）。"""
     import numpy as np
+    from src.capture.desktop_capture import DesktopCapture
     pixels = np.ascontiguousarray(np.asarray(crop.convert("RGB"))[:, :, ::-1])
-    if pixels.size == 0 or float(np.std(pixels)) < 8.0:
-        return False
-    header = pixels[:45]
-    blue, green, red = header[:, :, 0], header[:, :, 1], header[:, :, 2]
-    red_dark = (red > green * 1.25) & (red > blue * 1.15) & (red < 140)
-    return float(np.mean(red_dark)) > 0.08
+    return bool(DesktopCapture._panel_is_visible(pixels))
 
 
 _FONT_CACHE: dict[int, object] = {}
@@ -688,12 +703,12 @@ def build_region_preview(config=None, grabber: Optional[Callable] = None,
             checks.append(_check("dpi", "显示缩放（DPI）", STATUS_OK,
                                  f"{dpi}（{round(dpi / 96 * 100)}%）"))
         else:
-            # 不再当致命错误：换算是按物理像素做的，只是非 100% 缩放下
-            # 物理/逻辑像素会分裂，容易被别的东西搞乱，所以给提示。
+            # 非 100% 缩放不影响运行：坐标按物理像素换算，进程也声明了 DPI
+            # 感知，截图与点击的对应关系与缩放无关，这里只把真实值报出来。
             checks.append(_check(
                 "dpi", "显示缩放（DPI）", STATUS_WARN,
-                f"{dpi}（{round(dpi / 96 * 100)}%，建议 100%）",
-                "显示设置 → 缩放建议改成 100%：不是 100% 时物理/逻辑像素会分裂。",
+                f"{dpi}（{round(dpi / 96 * 100)}%）",
+                "不需要改：缩放不影响截图与点击的对应关系（坐标按物理像素换算）。",
                 required=False))
 
     # --- 换算可用性：客户区比例与尺寸（这两条才是真正的判定）

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import FSM_action
 from src.flow.mulligan_flow import MulliganFlow, MulliganStatus
-from config import RecommendationConfig
+from src.recommendation_config import RecommendationConfig
 
 
 class MulliganTimingTests(unittest.TestCase):
@@ -69,16 +69,20 @@ class MulliganTimingTests(unittest.TestCase):
             "auto_mulligan_flow",
             "recommendation_flow",
             "recommendation_config",
-            "recommendation_source",
-            "winrate_source",
+            "recommendation_capture",
+            "mulligan_capture",
+            "recommendation_parser",
+            "recommendation_reader",
+            "mulligan_reader",
             "recommendation_validator",
         )
         originals = {name: getattr(FSM_action, name) for name in names}
         try:
-            # Pre-populate the expensive collaborators: initialization
+            # Pre-populate the expensive OCR collaborators: initialization
             # only needs to wire them into the production flow for this test.
-            FSM_action.recommendation_source = object()
-            FSM_action.winrate_source = object()
+            FSM_action.recommendation_parser = object()
+            FSM_action.recommendation_reader = object()
+            FSM_action.mulligan_reader = object()
             FSM_action.recommendation_validator = object()
 
             FSM_action.initialize_recommendation_automation()
@@ -86,6 +90,16 @@ class MulliganTimingTests(unittest.TestCase):
             post_ocr = RecommendationConfig().mulligan_post_ocr_delay_seconds
             self.assertEqual(post_ocr, FSM_action.auto_mulligan_flow.first_delay)
             self.assertEqual(post_ocr, FSM_action.auto_mulligan_flow.retry_delay)
+            # 换牌 OCR 用独立的大 ROI，回合推荐仍用小 ROI。
+            self.assertEqual(
+                FSM_action.recommendation_config.recommendation_roi,
+                FSM_action.recommendation_capture.roi)
+            self.assertEqual(
+                FSM_action.recommendation_config.mulligan_recommendation_roi,
+                FSM_action.mulligan_capture.roi)
+            self.assertNotEqual(
+                FSM_action.recommendation_capture.roi,
+                FSM_action.mulligan_capture.roi)
         finally:
             for name, value in originals.items():
                 setattr(FSM_action, name, value)

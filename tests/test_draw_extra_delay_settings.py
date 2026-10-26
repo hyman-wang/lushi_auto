@@ -22,23 +22,29 @@ class ConfigTests(unittest.TestCase):
         self.assertIn(KEY, _USER_DELAY_KEYS)
 
     def test_key_is_part_of_the_user_delay_whitelist(self):
+        # 白名单尾部顺序会随新增项变化（例如后来的 discover_target_delay_seconds），
+        # 这里只锁"抽牌延时在延迟项区域里、且排在 OCR 缩放之前"。
         self.assertIn(KEY, _USER_DELAY_KEYS)
+        self.assertLess(_USER_DELAY_KEYS.index(KEY),
+                        _USER_DELAY_KEYS.index("ocr_preprocess_scale"))
 
     def test_config_leaf_matches_the_field(self):
-        self.assertTrue(hasattr(RecommendationConfig, KEY))
+        from src.recommendation_config import RecommendationConfig as Forwarded
+
+        self.assertTrue(hasattr(Forwarded, KEY))
 
 
 class FlowDefaultTests(unittest.TestCase):
     def test_flow_defaults_to_disabled_for_library_callers(self):
         flow = RecommendationFlow(
-            source=None, mapper=None, state_supplier=None,
+            capture=None, reader=None, parser=None, state_supplier=None,
             adapter=None, validator=None, controller=None)
 
         self.assertEqual(0.0, flow.draw_extra_delay_per_card)
 
     def test_flow_takes_the_configured_seconds(self):
         flow = RecommendationFlow(
-            source=None, mapper=None, state_supplier=None,
+            capture=None, reader=None, parser=None, state_supplier=None,
             adapter=None, validator=None, controller=None,
             draw_extra_delay_per_card=2.5)
 
@@ -49,7 +55,9 @@ class FsmWiringTests(unittest.TestCase):
     def test_production_flow_gets_the_configured_draw_delay(self):
         """initialize_recommendation_automation() 必须把配置传进流程。"""
         names = ("recommendation_flow", "recommendation_config",
-                 "recommendation_source", "winrate_source",
+                 "recommendation_capture", "mulligan_capture",
+                 "recommendation_parser",
+                 "recommendation_reader", "mulligan_reader",
                  "recommendation_validator")
         originals = {name: getattr(FSM_action, name) for name in names}
 
@@ -63,8 +71,9 @@ class FsmWiringTests(unittest.TestCase):
                 draw_extra_delay_per_card_seconds=1.5)
 
         try:
-            FSM_action.recommendation_source = object()
-            FSM_action.winrate_source = object()
+            FSM_action.recommendation_parser = object()
+            FSM_action.recommendation_reader = object()
+            FSM_action.mulligan_reader = object()
             FSM_action.recommendation_validator = object()
             with patch.object(FSM_action, "RecommendationConfig", stub_config):
                 FSM_action.initialize_recommendation_automation()

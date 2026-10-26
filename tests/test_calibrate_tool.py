@@ -296,7 +296,7 @@ class CardDragTests(unittest.TestCase):
         self.assertEqual((base[0] - 400, base[1] + 120), moved[:2])
 
     def test_dragging_the_card_does_not_touch_any_region_box(self):
-        """拖卡片是纯界面行为：12 个 ROI 框一个都不许动。"""
+        """拖卡片是纯界面行为：13 个 ROI 框一个都不许动。"""
         before = [list(t["box"]) for t in self.session.targets]
         x, y = self._title_point()
         self.session._on_mouse_down(x, y, self.WIDTH, self.HEIGHT)
@@ -694,7 +694,11 @@ class ActiveTargetMappingTests(unittest.TestCase):
 
         kind, index = session._hit_test(cx, cy, *size)
         self.assertEqual("target", kind)
-        self.assertEqual(7, index)      # 正中央恰好压在第 7 行上
+        # 正中央落在哪一行由目标数量/布局决定，不写死序号。
+        expected = next(i for rect, i in session._chip_rects(*size)
+                        if rect[0] <= cx <= rect[2]
+                        and rect[1] <= cy <= rect[3])
+        self.assertEqual(expected, index)
 
     def test_no_mapping_draws_at_the_raw_box(self):
         """拿不到客户区几何时是恒等换算：框仍画在它的坐标上。"""
@@ -753,6 +757,16 @@ class WindowFollowTests(unittest.TestCase):
         # 真实的 4K 桌面：窗口挪到右下角时框也仍在屏幕内（不被 _clamp 收边）。
         session.width, session.height = 3840, 2160
         self.session = session
+        # `box_to_screen()` 默认按**真实桌面**（display_mapping.desktop_bounds）
+        # 夹取。本机桌面是 2560×1440：窗口挪到右下角时框底会被切掉，和"跟随窗口"
+        # 的偏移断言无关，换台小屏机器就会失败。把桌面钉成上面注释里的 4K 尺寸，
+        # 用例在任何屏幕上结果一致。
+        self._desktop_patch = patch.object(
+            display_mapping, "desktop_bounds", return_value=(0, 0, 3840, 2160))
+        self._desktop_patch.start()
+
+    def tearDown(self):
+        self._desktop_patch.stop()
 
     def _mapping(self):
         return display_mapping.DisplayMapping(
@@ -1178,6 +1192,38 @@ class CardButtonTests(unittest.TestCase):
             self.assertGreater(layer.getpixel(self._center(rect))[3], 0)
 
 
+class LayoutScaleTests(unittest.TestCase):
+    """高 DPI 下目标条按 UI_SCALE 放大，不再窄成一条。"""
+
+    def setUp(self):
+        self._saved_scale = calibrate_roi.UI_SCALE
+
+    def tearDown(self):
+        calibrate_roi.UI_SCALE = self._saved_scale
+
+    def test_card_is_wider_and_scaled_by_dpi(self):
+        calibrate_roi.UI_SCALE = 1.0
+        base = calibrate_roi.card_rect(3840, 2160)
+
+        calibrate_roi.UI_SCALE = 1.5
+        scaled = calibrate_roi.card_rect(3840, 2160)
+
+        self.assertEqual(calibrate_roi.sp(calibrate_roi.CARD_W),
+                         scaled[2] - scaled[0])
+        self.assertGreater(scaled[2] - scaled[0], base[2] - base[0])
+        self.assertAlmostEqual(3840 / 2, (scaled[0] + scaled[2]) / 2, delta=1)
+
+    def test_card_height_scales_with_dpi(self):
+        session = make_session()
+        calibrate_roi.UI_SCALE = 1.0
+        base = session._card_height()
+
+        calibrate_roi.UI_SCALE = 1.5
+        scaled = session._card_height()
+
+        self.assertGreater(scaled, base)
+
+
 class HintWrapTests(unittest.TestCase):
     """说明自动换行：每行都在卡片内宽之内，超出行数才截断加省略号。"""
 
@@ -1232,8 +1278,9 @@ class HintWrapTests(unittest.TestCase):
         session.active_index = 0
         self.assertEqual(calibrate_roi.CARD_H, session._card_height())
 
-        # 最后那个目标的说明最长（会换行），卡片相应加高一行。
-        session.active_index = len(session.targets) - 1
+        # 把当前目标的说明换成长文本，卡片要按换行行数加高。
+        session.targets[0]["hint"] = "很长的说明：" + "字" * 120
+        session._card_h_cache.clear()
         self.assertGreater(session._card_height(), calibrate_roi.CARD_H)
 
     def test_hint_parts_split_the_highlighted_head(self):

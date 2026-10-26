@@ -81,8 +81,18 @@ class MeasuredOffsetTests(unittest.TestCase):
                          self.mapping.box_to_screen((1, 296, 196, 544)))
 
     def test_post_game_button_gets_the_offset(self):
+        # 只看"加偏移"的数学：框底 1486 很可能超出本机真实桌面高度
+        # （本机 2560×1440），默认 clamp 会把它夹到屏幕内 —— 那是抓图安全行为，
+        # 不属于这个用例要验的偏移。所以这里显式 clamp=False。
         self.assertEqual((2285, 1416, 2435, 1486),
-                         self.mapping.box_to_screen((1325, 865, 1475, 935)))
+                         self.mapping.box_to_screen((1325, 865, 1475, 935),
+                                                    clamp=False))
+        # 生产路径（默认 clamp）仍然必须把越界框夹进真实桌面，不能交给抓图抛异常。
+        bounds = dm.desktop_bounds()
+        clamped = self.mapping.box_to_screen((1325, 865, 1475, 935))
+        self.assertEqual(
+            (2285, 1416, 2435, min(1486, bounds[3])), clamped)
+        self.assertLessEqual(clamped[3], bounds[3])
 
     def test_client_screen_box(self):
         self.assertEqual((960, 551, 2880, 1631), self.mapping.client_box)
@@ -673,6 +683,54 @@ class CaptureRegionTests(unittest.TestCase):
 
         self.assertIsNone(frame)
         self.assertIsNotNone(mapping, "抓图失败也要把几何给调用方")
+
+
+class _StyleReader:
+    """假 GetWindowLongW：只回样式值，`restype`/`argtypes` 可写。"""
+
+    restype = None
+    argtypes = None
+
+    def __init__(self, style):
+        self.style = style
+
+    def __call__(self, hwnd, index):
+        return self.style
+
+
+class WindowModeTests(unittest.TestCase):
+    """全屏 / 窗口化的判定：只认标题栏，不认尺寸。"""
+
+    def test_caption_means_windowed(self):
+        self.assertEqual("windowed", dm.classify_window_mode(dm.WS_CAPTION))
+        self.assertEqual("windowed", dm.classify_window_mode(0x16CF0000))
+
+    def test_popup_without_caption_means_fullscreen(self):
+        self.assertEqual("fullscreen", dm.classify_window_mode(0x80000000))
+        self.assertEqual("fullscreen", dm.classify_window_mode(0x86000000))
+
+    def test_broken_style_is_unknown(self):
+        self.assertEqual("unknown", dm.classify_window_mode(None))
+        self.assertEqual("unknown", dm.classify_window_mode("x"))
+
+    def test_window_mode_reads_the_window_style(self):
+        import types
+
+        fake = types.SimpleNamespace(user32=types.SimpleNamespace(
+            GetWindowLongW=_StyleReader(dm.WS_CAPTION)))
+        with patch.object(dm.ctypes, "windll", fake, create=True):
+            self.assertEqual("windowed", dm.window_mode(hwnd=123))
+
+    def test_window_mode_never_raises(self):
+        """拿不到窗口/样式时安静返回 unknown（自检不能因为辅助调用炸掉）。"""
+        import types
+
+        fake = types.SimpleNamespace(user32=types.SimpleNamespace(
+            GetWindowLongW=_StyleReader(None)))
+        with patch.object(dm.ctypes, "windll", fake, create=True):
+            self.assertEqual("unknown", dm.window_mode(hwnd=123))
+        with patch("display_mapping.ctypes.windll", None, create=True):
+            self.assertEqual("unknown", dm.window_mode(hwnd=123))
 
 
 if __name__ == "__main__":

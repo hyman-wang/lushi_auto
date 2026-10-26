@@ -45,7 +45,12 @@ build/codesign/
 .tmp-tests/
 .workbuddy/
 log/
+# 脚本自写日志与出错反馈包（对战日志 .txt/.jsonl、反馈_*.zip、截图）都是本机产物
+logs/
 out.jpg
 snapshot_live.jpg
 __pycache__/
 pytest-cache-files-*
+
+# 本地 agent 记忆目录（每台机器各自维护，不入库）
+.workbuddy-ai/

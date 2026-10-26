@@ -33,7 +33,8 @@ class RegionRegistryTests(unittest.TestCase):
 
     def test_lists_every_screenshot_region(self):
         self.assertEqual(
-            ["recommendation", "mulligan_confirm", "win_rate", "win_rate_wide",
+            ["recommendation", "mulligan_recommendation", "mulligan_confirm",
+             "win_rate", "win_rate_wide",
              "post_game_start", "rank", "main_menu_battle", "deck_select_title",
              "deck_grid",
              "mode_menu_open", "mode_wild", "mode_standard", "mode_casual"],
@@ -43,7 +44,17 @@ class RegionRegistryTests(unittest.TestCase):
         boxes = {region["key"]: region["box"] for region in self.regions}
 
         self.assertEqual((7, 200, 202, 500), boxes["recommendation"])
+        self.assertEqual(screen_regions.MULLIGAN_RECOMMENDATION_REGION,
+                         boxes["mulligan_recommendation"])
         self.assertEqual((860, 810, 1060, 890), boxes["mulligan_confirm"])
+
+    def test_mulligan_recommendation_default_matches_config(self):
+        from config import RecommendationConfig
+
+        field = RecommendationConfig.__dataclass_fields__[
+            "mulligan_recommendation_roi"]
+        self.assertEqual(field.default,
+                         screen_regions.MULLIGAN_RECOMMENDATION_REGION)
 
     def test_boxes_are_well_formed_and_keys_unique(self):
         for region in self.regions:
@@ -62,6 +73,15 @@ class RegionRegistryTests(unittest.TestCase):
 
         box = next(r["box"] for r in regions if r["key"] == "recommendation")
         self.assertEqual((7, 200, 202, 500), box)
+
+    def test_win_rate_regions_match_the_automation(self):
+        """预览画的框必须和自动投降实际截的区域一模一样。"""
+        import FSM_action
+
+        self.assertEqual(FSM_action._AI_WIN_RATE_REGIONS[0],
+                         screen_regions.AI_WIN_RATE_REGION)
+        self.assertEqual(FSM_action._AI_WIN_RATE_REGIONS[1],
+                         screen_regions.AI_WIN_RATE_WIDE_REGION)
 
     def test_post_game_regions_match_the_automation(self):
         """每局结束用的「开始」按钮 / 段位框必须和 FSM_action 读的区域一致。"""
@@ -90,14 +110,16 @@ class CalibrationTargetTests(unittest.TestCase):
     def test_lists_the_calibratable_targets(self):
         targets = screen_regions.calibration_targets(make_config())
 
-        self.assertEqual(["recommendation", "mulligan_confirm", "win_rate",
+        self.assertEqual(["recommendation", "mulligan_recommendation",
+                          "mulligan_confirm", "win_rate",
                           "post_game_start", "rank",
                           "main_menu_battle", "deck_select_title", "deck_grid",
                           "mode_menu_open", "mode_wild", "mode_standard",
                           "mode_casual"],
                          [target["key"] for target in targets])
         self.assertEqual(
-            ["recommendation_roi", "mulligan_confirm_roi", "ai_win_rate_roi",
+            ["recommendation_roi", "mulligan_recommendation_roi",
+             "mulligan_confirm_roi", "ai_win_rate_roi",
              "post_game_start_roi", "post_game_rank_roi",
              "main_menu_battle_roi", "deck_select_title_roi", "deck_grid_roi",
              "mode_menu_open", "mode_wild", "mode_standard", "mode_casual"],
@@ -180,6 +202,8 @@ class CalibrationTargetTests(unittest.TestCase):
                  for target in screen_regions.calibration_targets(make_config())}
 
         self.assertEqual((7, 200, 202, 500), boxes["recommendation"])
+        self.assertEqual(screen_regions.MULLIGAN_RECOMMENDATION_REGION,
+                         boxes["mulligan_recommendation"])
         self.assertEqual((860, 810, 1060, 890), boxes["mulligan_confirm"])
         self.assertEqual(screen_regions.AI_WIN_RATE_REGION, boxes["win_rate"])
 
@@ -212,6 +236,23 @@ class CalibrationTargetTests(unittest.TestCase):
                                               "win_rate")["config_key"])
         self.assertIsNone(
             screen_regions.calibration_target(make_config(), "nope"))
+
+    def test_automation_reads_the_calibrated_win_rate_region(self):
+        """自动投降实际截的区域也要跟着校准值走。"""
+        import FSM_action
+
+        saved = FSM_action.recommendation_config
+        try:
+            FSM_action.recommendation_config = SimpleNamespace(
+                ai_win_rate_roi=(120, 12, 280, 52),
+                ai_win_rate_wide_roi=(105, 0, 310, 64))
+            self.assertEqual(((120, 12, 280, 52), (105, 0, 310, 64)),
+                             FSM_action._ai_win_rate_regions())
+            FSM_action.recommendation_config = None
+            self.assertEqual(FSM_action._AI_WIN_RATE_REGIONS,
+                             FSM_action._ai_win_rate_regions())
+        finally:
+            FSM_action.recommendation_config = saved
 
     def test_state_probe_points_are_copies(self):
         points = screen_regions.state_probe_points()
@@ -293,7 +334,8 @@ class RegionPreviewTests(unittest.TestCase):
         self.assertTrue(result["ok"], result["checks"])
         dpi = next(c for c in result["checks"] if c["key"] == "dpi")
         self.assertFalse(dpi["required"])
-        self.assertIn("100%", dpi["hint"])
+        # 提示不再劝人改成 100%（缩放不影响识别），但仍要说明它只是信息。
+        self.assertIn("不影响", dpi["hint"])
 
     def test_missing_client_mapping_is_only_a_hint(self):
         result = self.preview()
@@ -434,8 +476,11 @@ class RegionBoxDrawingTests(unittest.TestCase):
 
     def test_skip_keys_omits_the_region_entirely(self):
         """被跳过的区域在这一层里一个像素都不画（改由校准窗口单独高亮）。"""
+        # mapping=None：按客户区相对坐标画，不受这台机器的窗口位置/缩放影响
+        # （不传就会走真实显示换算，炉石窗口一挪这条就假失败）。
         layer = region_overlay.paint_layer(
-            1920, 1080, None, self.config, skip_keys=("post_game_start",))
+            1920, 1080, None, self.config, skip_keys=("post_game_start",),
+            mapping=None)
 
         left, top, right, bottom = (1325, 865, 1475, 935)
         for x in range(left, right + 1):

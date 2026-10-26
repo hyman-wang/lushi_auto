@@ -14,6 +14,10 @@ class ActionKind(str, Enum):
     USE_LOCATION = "use_location"
     LAUNCH_STARSHIP = "launch_starship"
     CHOOSE_DISCOVER = "choose_discover"
+    # 四选一/发现选完选项后，游戏还要你再点一个目标（克苏恩「凝视」、鲍勃
+    # 「招募随从」）。盒子会打成「选择对方N号位卡牌」，与选项面板的「选择我方
+    # N号位卡牌」不是一回事：这个动作不点选项，只点场上目标。
+    SELECT_TARGET = "select_target"
     END_TURN = "end_turn"
     TIMELINE_UNDO = "timeline_undo"
     TIMELINE_KEEP = "timeline_keep"
@@ -24,6 +28,42 @@ class SlotRef:
     kind: str
     owner: Optional[str] = None
     index: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class FrameEvidence:
+    frame_id: str
+    captured_at: float
+    desktop_size: tuple[int, int]
+    dpi: int
+    window_handle: int
+    foreground: bool
+    recommendation_roi: tuple[int, int, int, int]
+    exact_hash: str
+    perceptual_hash: str
+    panel_visible: bool
+    pixels: Any = None
+    # 抓这一帧时的炉石客户区尺寸（参考帧口径，见 display_mapping.REFERENCE_CLIENT）。
+    # None = 未知（旧证据/测试构造），此时跳过客户区一致性校验。
+    client_size: Optional[tuple[int, int]] = None
+
+
+@dataclass(frozen=True)
+class OcrLine:
+    text: str
+    confidence: float
+    box: tuple[tuple[float, float], ...] = ()
+
+
+@dataclass(frozen=True)
+class OcrEvidence:
+    frame_id: str
+    created_at: float
+    lines: tuple[OcrLine, ...]
+    normalized_text: str
+    confidence: float
+    backend: str
+    preprocessing: str
 
 
 @dataclass(frozen=True)

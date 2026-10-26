@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class VersionTests(unittest.TestCase):
-    def test_version_is_release_date(self):
-        # 版本号 = 发布日期（v2026.10.27），与上游 version.py 口径一致。
-        self.assertRegex(__version__, r"^\d{4}\.\d{2}\.\d{2}$")
+    def test_version_is_semver(self):
+        # 本分支沿用语义化版本（v1.3.25）；上游日期口径只是参考。
+        self.assertRegex(__version__, r"^\d+\.\d+\.\d+$")
         self.assertEqual(__version__, version.VERSION)
 
     def test_launcher_build_reads_version_py(self):

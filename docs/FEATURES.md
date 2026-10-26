@@ -77,8 +77,8 @@
 | 日志浮窗 | 置顶半透明小窗：实时日志、战绩、启动／停止、重启炉石、校准、保存日志 | 网页「日志浮窗」／`hsctl overlay on` |
 | 命令行 | 30 余条命令，覆盖上面全部功能；`repl` 可进交互模式省掉重复敲 `hsctl` | `hsctl --help`／`hsctl repl` |
 | HTTP 接口 | GET 读状态/日志/自检/查卡，POST 改配置/发指令；`--json` 输出供 agent 调用 | 见 `web_ui.py` 路由表 |
-| 版本号 | 版本号 = 发布日期（如 `v2026.10.24`），只有 `version.py` 一处可改，浮窗品牌行右侧、网页顶栏、`hsctl --version` 显示同一个串 | `version.py`／`hsctl --version`／`GET /api/version` |
-| 最新版本检查 | 后台从 GitHub（jsDelivr / gh-proxy / raw / Release tag 多源降级）拉线上最新发布日期，6 小时缓存；浮窗「装好没反应？」弹窗显示「本机 / 最新」，断网或远端未发布只报「获取失败 / 线上未发布」，绝不假装最新 | 浮窗按钮／`update_check.py`／`log/update_cache.json` |
+| 版本号 | 语义化版本（如 `v1.3.25`），只有 `version.py` 一处可改，浮窗品牌行右侧、网页顶栏、`hsctl --version` 显示同一个串 | `version.py`／`hsctl --version`／`GET /api/version` |
+| 最新版本检查 | 后台从 GitHub（jsDelivr / gh-proxy / raw / Release tag 多源降级）拉线上最新版本号，6 小时缓存；浮窗「装好没反应？」弹窗显示「本机 / 最新」，断网或远端未发布只报「获取失败 / 线上未发布」，绝不假装最新 | 浮窗按钮／`update_check.py`／`log/update_cache.json` |
 | 「装好没反应？」自查 | 浮窗按钮区最后一行：「装好没反应？」点开弹窗：① 群里是否最新（本机/最新版本）② 自检是否全过 ③ 是否校准过，回应「装好却不动」 | 浮窗底部按钮 |
 | 提权托管 | 借计划任务以最高权限常驻（鼠标注入需要），支持自停与状态查询 | `hsctl serve start --via-task` |
 | 自诊 | 一条命令查解释器、依赖、控制台、提权状态，并给出下一步该跑什么 | `hsctl doctor` |
@@ -103,7 +103,7 @@
 | 文件 | 职责 |
 | --- | --- |
 | `hsctl.py` | 命令行入口，本质是 web_ui 的客户端 |
-| `version.py` | 版本号的唯一来源（版本号 = 发布日期），浮窗／网页／CLI 都读它 |
+| `version.py` | 版本号的唯一来源（语义化版本），浮窗／网页／CLI 都读它 |
 | `update_check.py` | 从 GitHub 镜像拉线上最新版本号（多源降级 + 6h 缓存），只给浮窗自查弹窗用，导入不联网 |
 | `main.py` | 不走控制台的原始入口：终端交互打牌 + Ctrl+Q 退出 |
 | `web_ui.py` | HTTP 服务、路由、所有 API 与后台线程 |

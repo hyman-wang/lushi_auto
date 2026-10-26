@@ -5,11 +5,12 @@
 `web_ui.Handler.server_version = "HSLegendArriver/1.0"`。两处改一处就会不一致，
 而且界面上根本看不到，用户没法判断「手上这版是哪天的」。
 
-用户定的口径：**版本号就是发布日期**（`2026.10.17`），界面显示 `v2026.10.17`，
-后面不挂 git 短哈希。这里锁四件事：
+本分支口径：**语义化版本**（`1.3.25`），界面显示 `v1.3.25`，后面不挂 git 短哈希。
+（上游主线用的是发布日期 `2026.10.24`，两套口径 `update_check` 都认但互不比较。）
+这里锁四件事：
 
-1. `version.py` 是唯一来源，VERSION 必须是合法的 `YYYY.MM.DD`；
-2. VERSION 要和 CHANGELOG 最上面那条日期对得上（防止发版忘了改）；
+1. `version.py` 是唯一来源，VERSION 必须是合法的 `X.Y.Z`；
+2. CHANGELOG 最上面那条要是**今天**（防止发版忘了记）；
 3. `/api/status` 与 `/api/version` 都带 version 字段，HTTP 头也统一；
 4. 网页与浮窗的显示位真的存在（不是只改了后端）。
 """
@@ -28,14 +29,12 @@ ROOT = Path(__file__).resolve().parent.parent
 class VersionValueTests(unittest.TestCase):
     """VERSION 的取值口径：发布日期。"""
 
-    def test_version_is_release_date(self):
+    def test_version_is_semver(self):
         parts = version.VERSION.split(".")
         self.assertEqual(3, len(parts), version.VERSION)
-        self.assertEqual(4, len(parts[0]), version.VERSION)
         self.assertTrue(all(p.isdigit() for p in parts), version.VERSION)
-        self.assertTrue(all(len(p) == 2 for p in parts[1:]), version.VERSION)
-        # 必须是真实存在的日期（挡掉 2026.13.40 这种手滑）
-        datetime.strptime(version.VERSION, "%Y.%m.%d")
+        # 不接受前导零（挡掉 1.03.25 这种手滑）
+        self.assertTrue(all(str(int(p)) == p for p in parts), version.VERSION)
 
     def test_label_is_v_prefix_without_hash(self):
         label = version.version_label()
@@ -50,15 +49,14 @@ class VersionValueTests(unittest.TestCase):
         self.assertEqual(version.VERSION, info["version"])
         self.assertEqual(version.version_label(), info["label"])
 
-    def test_version_matches_changelog_head(self):
-        """发版时改 VERSION 容易忘：CHANGELOG 最上面那条的日期就是最新发布日。"""
+    def test_changelog_head_is_today(self):
+        """发版时改 VERSION 容易忘：CHANGELOG 最上面那条应是今天的发布记录。"""
         text = (ROOT / "CHANGELOG.md").read_text(encoding="utf8")
         match = re.search(r"^\|\s*(\d{4})-(\d{2})-(\d{2})\s*\|", text, re.M)
         self.assertIsNotNone(match, "CHANGELOG 里找不到第一行日期")
-        head = ".".join(match.groups())
-        self.assertEqual(head, version.VERSION,
-                         f"CHANGELOG 最新日期 {head} 与 version.VERSION "
-                         f"{version.VERSION} 不一致：发版要同步改 version.py")
+        head = "-".join(match.groups())
+        self.assertEqual(head, datetime.now().strftime("%Y-%m-%d"),
+                         f"CHANGELOG 最新日期 {head} 不是今天：发版要补一条记录")
 
 
 class StatusApiTests(unittest.TestCase):

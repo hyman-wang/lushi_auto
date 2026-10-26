@@ -37,6 +37,8 @@ _VERSION_RE = re.compile(r'^VERSION\s*=\s*"[^"]*"', re.MULTILINE)
 _VERSION_VALUE_RE = re.compile(r'^VERSION\s*=\s*"([^"]+)"', re.MULTILINE)
 _CHANGELOG_HEAD_RE = re.compile(r"^\|\s*(\d{4})-(\d{2})-(\d{2})\s*\|", re.MULTILINE)
 _DATE_INPUT_RE = re.compile(r"^(\d{4})[.\-]?(\d{2})[.\-]?(\d{2})$")
+# 本分支用语义化版本（1.3.25）；上游用发布日期（2026.10.24）。两种都接受。
+_SEMVER_INPUT_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _TABLE_RULE = "| --- | --- | --- |"
 
 
@@ -53,13 +55,29 @@ def parse_release_date(value) -> str:
     return f"{year}.{month}.{day}"
 
 
+def parse_version_arg(value) -> str:
+    """接受 ``2026.10.24``（发布日期）或 ``1.3.25``（语义化），归一成同形字符串。"""
+    text = str(value or "").strip()
+    if _DATE_INPUT_RE.fullmatch(text):
+        return parse_release_date(text)
+    match = _SEMVER_INPUT_RE.fullmatch(text)
+    if match is None:
+        raise SystemExit(
+            f"版本号格式不对：{value!r}（应为 1.3.25 或 2026.10.24）")
+    return ".".join(str(int(part)) for part in match.groups())
+
+
+def is_date_version(value) -> bool:
+    return _DATE_INPUT_RE.fullmatch(str(value or "").strip()) is not None
+
+
 def read_version(text: str = None) -> str:
     if text is None:
         text = VERSION_PATH.read_text(encoding="utf-8")
     match = _VERSION_VALUE_RE.search(text)
     if match is None:
         raise RuntimeError("version.py 里找不到 VERSION = \"...\"")
-    return parse_release_date(match.group(1))
+    return parse_version_arg(match.group(1))
 
 
 def replace_version(text: str, version: str) -> str:
@@ -79,11 +97,17 @@ def changelog_head_date(text: str = None) -> str:
 
 
 def changelog_row(version: str, summary: str) -> str:
-    """CHANGELOG 表格的一行（日期用 ``YYYY-MM-DD``）。"""
+    """CHANGELOG 表格的一行。
+
+    第一列永远是**发布日**（``YYYY-MM-DD``）：版本号是日期口径时就用它，
+    是语义化版本（``1.3.25``）时用当天日期。
+    """
     summary = " ".join(str(summary or "").split())
     if not summary:
         raise ValueError("CHANGELOG 摘要不能为空")
-    return f"| {version.replace('.', '-')} | 本次 | {summary} |"
+    column = (version.replace(".", "-") if is_date_version(version)
+              else datetime.now().strftime("%Y-%m-%d"))
+    return f"| {column} | 本次 | {summary} |"
 
 
 def insert_changelog_row(text: str, row: str) -> str:
@@ -113,18 +137,27 @@ def command_check(_args) -> int:
     version = read_version()
     head = changelog_head_date()
     problems = []
-    if version != head:
-        problems.append(
-            f"version.py VERSION={version} 与 CHANGELOG 首行 {head} 不一致")
-    try:
-        datetime.strptime(version, "%Y.%m.%d")
-    except ValueError:
-        problems.append(f"VERSION 不是真实日期：{version}")
+    if is_date_version(version):
+        # 日期口径：VERSION 就是发布日，必须与 CHANGELOG 首行一致。
+        if version != head:
+            problems.append(
+                f"version.py VERSION={version} 与 CHANGELOG 首行 {head} 不一致")
+        try:
+            datetime.strptime(version, "%Y.%m.%d")
+        except ValueError:
+            problems.append(f"VERSION 不是真实日期：{version}")
+    else:
+        # 语义化口径：VERSION 是 1.3.25 这种，CHANGELOG 首行应是今天。
+        today = datetime.now().strftime("%Y.%m.%d")
+        if head != today:
+            problems.append(
+                f"VERSION={version}（语义化）要求 CHANGELOG 首行为今天 {today}，"
+                f"当前是 {head}")
     if problems:
         for problem in problems:
             print(f"[release] {problem}")
         return 1
-    print(f"[release] 版本号 {_tag_name(version)}，与 CHANGELOG 首行一致。")
+    print(f"[release] 版本号 {_tag_name(version)}，CHANGELOG 首行 {head}。")
     print("[release] 跑版本号测试：python -m unittest -q tests.test_version")
     code = _run([sys.executable, "-m", "unittest", "-q", "tests.test_version"])
     if code != 0:
@@ -147,7 +180,7 @@ def _write_like(path: Path, text: str, original_raw: bytes) -> None:
 
 
 def command_bump(args) -> int:
-    version = parse_release_date(args.version)
+    version = parse_version_arg(args.version)
     summary = args.summary
     current = read_version()
     version_raw = VERSION_PATH.read_bytes()
@@ -212,11 +245,11 @@ def build_parser() -> argparse.ArgumentParser:
     check.set_defaults(handler=command_check)
 
     bump = sub.add_parser("bump", help="改 version.py 并在 CHANGELOG 顶部加一行")
-    bump.add_argument("version", help="新版本号，例如 2026.10.24")
+    bump.add_argument("version", help="新版本号，例如 1.3.25 或 2026.10.24")
     bump.add_argument("summary", help="CHANGELOG 一句话摘要")
     bump.set_defaults(handler=command_bump)
 
-    tag = sub.add_parser("tag", help="按 version.py 打 vYYYY.MM.DD 注释标签")
+    tag = sub.add_parser("tag", help="按 version.py 打 vX.Y.Z 注释标签")
     tag.add_argument("--push", action="store_true", help="同时 push main 和标签")
     tag.add_argument("--remote", default="mine", help="push 的远端（默认 mine）")
     tag.set_defaults(handler=command_tag)

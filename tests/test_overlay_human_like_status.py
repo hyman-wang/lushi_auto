@@ -25,7 +25,7 @@ class BrandHeaderTests(unittest.TestCase):
         self.assertEqual(log_overlay.BRAND_NAME, "HSLegendArriver")
         # 版本号单独一行小字（VERSION_TEXT），不再拼进 BRAND_NAME。
         self.assertTrue(log_overlay.VERSION_TEXT.startswith("v"))
-        self.assertIn("2026.", log_overlay.VERSION_TEXT)
+        self.assertEqual(log_overlay.VERSION_TEXT, log_overlay.version.version_label())
         self.assertFalse(hasattr(log_overlay, "BRAND_SUB"))
         source = inspect.getsource(log_overlay._run)
         self.assertNotIn("BRAND_SUB", source)

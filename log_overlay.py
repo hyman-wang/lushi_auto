@@ -355,6 +355,11 @@ def self_check_text(info=None) -> str:
         first = f"① 本机 {local}（线上还是 {latest}）—— 本地比线上新，确认群里发的是哪版。"
     elif state == "remote_missing":
         first = f"① 群里文件是否最新：本机 {local}（线上还没发布版本号）。"
+    elif state == "unknown" and latest:
+        # 拿到了线上版本号，但和本机不是同一套口径（本分支语义化 1.3.25 /
+        # 上游日期 2026.10.24）：照实说出来，不判"最新"也不判"获取失败"。
+        first = (f"① 本机 {local}，线上 {latest}"
+                 f"（两套版本口径不同，不直接比较）。")
     elif info.get("checking"):
         first = f"① 正在获取线上最新版本…（本机 {local}）"
     else:

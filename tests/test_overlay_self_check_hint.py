@@ -66,6 +66,16 @@ class SelfCheckTextTests(unittest.TestCase):
             "state": "unknown", "local_label": "v2026.10.24"})
         self.assertIn("获取失败", failed)
 
+    def test_cross_scheme_says_both_without_judging(self):
+        """本机 1.3.25 / 线上 2026.10.24：两套口径，既不说最新也不说获取失败。"""
+        text = log_overlay.self_check_text({
+            "state": "unknown", "local_label": "v1.3.25",
+            "latest_label": "v2026.10.24"})
+        self.assertIn("v1.3.25", text)
+        self.assertIn("v2026.10.24", text)
+        self.assertIn("口径不同", text)
+        self.assertNotIn("获取失败", text)
+
     def test_garbage_payload_falls_back_to_local(self):
         for payload in (None, {}, "bad", 42):
             with self.subTest(payload=payload):

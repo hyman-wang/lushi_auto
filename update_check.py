@@ -46,6 +46,8 @@ DEFAULT_REPOS = (
 
 _VERSION_RE = re.compile(r"VERSION\s*=\s*[\"']([^\"']+)[\"']")
 _DATE_RE = re.compile(r"^[vV]?(\d{4})[.\-]?(\d{2})[.\-]?(\d{2})$")
+# 本分支用语义化版本（1.3.25）；上游用发布日期（2026.10.24）。两种都认。
+_SEMVER_RE = re.compile(r"^[vV]?(\d+)\.(\d+)\.(\d+)$")
 
 _LOCK = threading.Lock()
 _STATE = {"result": None, "loaded": False, "refreshing": False,
@@ -53,31 +55,56 @@ _STATE = {"result": None, "loaded": False, "refreshing": False,
 
 
 # ---------------------------------------------------------------- 版本号解析
-def parse_version(value):
-    """把 ``v2026.10.24`` / ``2026-10-24`` / ``2026-1024`` 归一成 ``2026.10.24``。
+def _version_key(value):
+    """把版本串解析成 ``(口径, 数字元组)``；认不出返回 None。
 
-    认不出、或不是真实日期（2026.13.40）时返回 None。历史 ``v1.0.0`` 这类
-    三段短号天然匹配不上，会被跳过。
+    口径只有两种：``date``（上游的发布日期 ``2026.10.24``）与 ``semver``
+    （本分支的 ``1.3.25``）。**先按日期解析**：``2026.10.24`` 虽然也符合
+    ``X.Y.Z``，但它是真实日期，按日期口径处理。
     """
-    match = _DATE_RE.fullmatch(str(value or "").strip())
-    if match is None:
+    text = str(value or "").strip()
+    match = _DATE_RE.fullmatch(text)
+    if match is not None:
+        try:
+            parsed = datetime(*(int(part) for part in match.groups()))
+        except ValueError:
+            return None
+        return ("date", (parsed.year, parsed.month, parsed.day))
+    match = _SEMVER_RE.fullmatch(text)
+    if match is not None:
+        return ("semver", tuple(int(part) for part in match.groups()))
+    return None
+
+
+def parse_version(value):
+    """归一化版本号：``v2026.10.24`` → ``2026.10.24``，``v1.3.25`` → ``1.3.25``。
+
+    认不出（``abc`` / ``2026.13.40`` / 带短哈希的 tag）时返回 None。
+    """
+    key = _version_key(value)
+    if key is None:
         return None
-    try:
-        parsed = datetime(*(int(part) for part in match.groups()))
-    except ValueError:
-        return None
-    return f"{parsed.year:04d}.{parsed.month:02d}.{parsed.day:02d}"
+    kind, nums = key
+    if kind == "date":
+        return f"{nums[0]:04d}.{nums[1]:02d}.{nums[2]:02d}"
+    return ".".join(str(num) for num in nums)
 
 
 def compare_versions(local, latest):
-    """返回 ``latest`` / ``update_available`` / ``local_newer`` / ``unknown``。"""
-    local_date = parse_version(local)
-    latest_date = parse_version(latest)
-    if local_date is None or latest_date is None:
+    """返回 ``latest`` / ``update_available`` / ``local_newer`` / ``unknown``。
+
+    **跨口径一律 unknown**：本分支是 ``1.3.25``，上游是 ``2026.10.24``，两个
+    数字体系不可比 —— 硬比只会把上游日期号误判成"有新版本"。
+    """
+    local_key = _version_key(local)
+    latest_key = _version_key(latest)
+    if local_key is None or latest_key is None:
         return "unknown"
-    if latest_date > local_date:
+    if local_key[0] != latest_key[0]:
+        return "unknown"
+    if latest_key[1] > local_key[1]:
         return "update_available"
-    if latest_date == local_date:
+    if latest_key[1] == local_key[1]:
         return "latest"
     return "local_newer"
 
@@ -187,7 +214,8 @@ def fetch_latest(fetch=None, now=None):
             last_error = f"HTTP {status}"
         # 这个仓库已拿到结果就不再试它的镜像；继续查下一个仓库。
     if candidates:
-        candidates.sort(key=lambda item: parse_version(item[0]), reverse=True)
+        candidates.sort(key=lambda item: _version_key(item[0]) or ("", (0,)),
+                        reverse=True)
         latest, source, repo = candidates[0]
         return {"latest": latest, "source": source, "repo": repo,
                 "missing": False, "error": None}

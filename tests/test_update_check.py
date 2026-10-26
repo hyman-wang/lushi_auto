@@ -33,8 +33,15 @@ class ParseVersionTests(unittest.TestCase):
             with self.subTest(raw=raw):
                 self.assertEqual("2026.10.24", uc.parse_version(raw))
 
-    def test_rejects_non_dates_and_old_tags(self):
-        for raw in ("", None, "v1.0.0", "2026.13.40", "2026.02.30",
+    def test_accepts_semver(self):
+        """本分支用语义化版本，1.3.25 这类也要能解析（浮窗要显示本机版本）。"""
+        for raw, expected in (("1.3.25", "1.3.25"), ("v1.3.25", "1.3.25"),
+                              ("v1.0.0", "1.0.0"), (" 1.03.25 ", "1.3.25")):
+            with self.subTest(raw=raw):
+                self.assertEqual(expected, uc.parse_version(raw))
+
+    def test_rejects_garbage(self):
+        for raw in ("", None, "2026.13.40", "2026.02.30",
                     "v2026.10.24+abc", "2026/10/24", "not-a-date"):
             with self.subTest(raw=raw):
                 self.assertIsNone(uc.parse_version(raw))
@@ -48,6 +55,23 @@ class ParseVersionTests(unittest.TestCase):
                          uc.compare_versions("2026.10.25", "2026.10.24"))
         self.assertEqual("unknown",
                          uc.compare_versions("2026.10.24", "bad"))
+
+    def test_semver_comparison(self):
+        self.assertEqual("update_available",
+                         uc.compare_versions("1.3.24", "1.3.25"))
+        self.assertEqual("latest", uc.compare_versions("1.3.25", "v1.3.25"))
+        self.assertEqual("local_newer",
+                         uc.compare_versions("1.4.0", "1.3.99"))
+        # 数值比较，不是字符串比较：1.10.0 比 1.9.0 新
+        self.assertEqual("update_available",
+                         uc.compare_versions("1.9.0", "1.10.0"))
+
+    def test_cross_scheme_is_never_compared(self):
+        """本分支 1.3.25 vs 上游 2026.10.24：两套口径不可比，一律 unknown。"""
+        self.assertEqual("unknown",
+                         uc.compare_versions("1.3.25", "2026.10.24"))
+        self.assertEqual("unknown",
+                         uc.compare_versions("2026.10.24", "1.3.25"))
 
 
 class FetchLatestTests(unittest.TestCase):
@@ -143,7 +167,8 @@ class FetchLatestTests(unittest.TestCase):
     def test_invalid_payloads_are_skipped(self):
         with self.env:
             fetch, _ = self.fake_fetch({
-                "version.py": (200, VERSION_PY.format("v1.0.0")),
+                # 认不出的版本串（语义化与日期都不是）才算无效载荷
+                "version.py": (200, VERSION_PY.format("abc")),
                 "releases/latest": (200, '{"tag_name": "2026.13.40"}'),
             })
             result = uc.fetch_latest(fetch=fetch)

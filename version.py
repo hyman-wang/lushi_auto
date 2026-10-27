@@ -25,7 +25,7 @@ from pathlib import Path
 NAME = "HSLegendArriver"
 
 #: 版本号（语义化 ``MAJOR.MINOR.PATCH``）。**每次发版只改这一处。**
-VERSION = "1.3.25"
+VERSION = "1.3.26"
 
 ROOT = Path(__file__).resolve().parent
 

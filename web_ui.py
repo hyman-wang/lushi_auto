@@ -4011,6 +4011,29 @@ def status_snapshot():
         prepared = CTRL.prepared
     elapsed = int(time.time() - time_begin) if time_begin > 0 else 0
     win_rate = round(wins * 100.0 / games, 1) if games else 0.0
+    # 「现在在干什么」：当前回合数与最近一条日志。读不到就给 0 / None，
+    # 绝不能让状态接口因为游戏没开、日志还没解析而抛错。
+    turn = 0
+    my_turn = False
+    if running:
+        try:
+            import FSM_action as _fsm_module
+
+            live = getattr(_fsm_module, "log_state", None)
+            if live is not None:
+                turn = int(live.game_entity.query_tag("TURN") or 0)
+                my_turn = bool(live.is_my_turn)
+        except Exception:
+            turn, my_turn = 0, False
+    last_log = None
+    try:
+        with _log_lock:
+            if _log_buffer:
+                entry = _log_buffer[-1]
+                last_log = {"level": entry["level"], "msg": entry["msg"],
+                            "t": entry["t"]}
+    except Exception:
+        last_log = None
     # 浮窗是否真的开着：网页用它同步「🪟 日志浮窗（开/关）」按钮文字，
     # 也能解释「为什么大按钮回到了开始运行」。
     try:
@@ -4038,6 +4061,10 @@ def status_snapshot():
         "concede_count": concedes,
         "win_rate": win_rate,
         "game_elapsed_sec": elapsed,
+        # 实时进度：第几回合、是不是我方回合、最近一条日志（前端状态卡直接显示）
+        "turn": turn,
+        "my_turn": my_turn,
+        "last_log": last_log,
         "schedule_start": start_iso,
         "schedule_end": end_iso,
         "concede": cfg.get("auto_concede") or dict(DEFAULT_AUTO_CONCEDE),

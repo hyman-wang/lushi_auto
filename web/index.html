@@ -75,6 +75,9 @@ a:hover{text-decoration:underline}
 .sc-state.warn{color:#e3b341}
 .sc-state.err{color:#ff7b72}
 .sc-sub{font-size:12px;color:var(--dim);margin-top:5px;min-height:16px}
+.sc-turn{font-size:13px;font-weight:700;color:#79c0ff;margin-top:7px}
+.sc-last{margin-top:11px;padding-top:9px;border-top:1px solid var(--line);font-size:11.5px;
+  color:var(--mute);font-family:Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:13px}
 .metric{background:#0a1017;border:1px solid var(--line);border-radius:7px;padding:7px 6px;text-align:center}
 .metric b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
@@ -100,9 +103,9 @@ a:hover{text-decoration:underline}
 .btn-small{height:22px;padding:0 8px;font-size:11px;font-weight:500}
 .btn-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 /* ================= 挂机保护（开关卡） ================= */
-.guards{display:grid;grid-template-columns:1fr 1fr;gap:9px;flex:none}
+.guards{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(2,minmax(62px,1fr));gap:9px;flex:1}
 .guard{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
-  display:flex;flex-direction:column;gap:6px;min-width:0}
+  display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0}
 .guard-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .guard-title{font-size:12.5px;font-weight:700;color:var(--text)}
 .guard-status{font-size:11px;color:var(--dim);line-height:1.35;
@@ -287,6 +290,7 @@ input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
         <div id="statusPill" class="pill idle"><span class="dot"></span><span id="pillText">空闲</span></div>
       </div>
       <div class="sc-state" id="stState">待机</div>
+      <div class="sc-turn" id="turnLine" style="display:none">第 1 回合</div>
       <div class="sc-sub" id="stopNote"></div>
       <div class="metrics">
         <div class="metric"><b id="stGames">0</b><span>对局</span></div>
@@ -295,6 +299,7 @@ input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
         <div class="metric"><b id="stConcede">0</b><span>认输</span></div>
       </div>
       <div class="sc-elapsed" id="gameElapsedRow" style="display:none">本局已进行 <b id="stElapsed">0:00</b></div>
+      <div class="sc-last" id="lastLogLine"></div>
     </div>
 
     <div class="actions">
@@ -1035,6 +1040,27 @@ function render(s){
     $("stopNote").textContent = s.stop_after_game ? "🔶 本局结束后将自动停止" : "";
   } else {
     er.style.display = "none";
+  }
+
+  /* 实时进度：第几回合 + 最近一条日志 */
+  var tl = $("turnLine");
+  if (tl){
+    if (s.running && s.in_game && s.turn){
+      tl.style.display = "";
+      tl.textContent = "第 " + s.turn + " 回合 · " + (s.my_turn ? "我方回合" : "对方回合");
+    } else {
+      tl.style.display = "none";
+    }
+  }
+  var ll = $("lastLogLine");
+  if (ll){
+    if (s.last_log && s.last_log.msg){
+      ll.textContent = "最近 · " + (s.last_log.t ? s.last_log.t + " " : "") + s.last_log.msg;
+      ll.style.color = s.last_log.level === "ERROR" ? "#ff7b72"
+                     : s.last_log.level === "WARN" ? "#e3b341" : "";
+    } else {
+      ll.textContent = "";
+    }
   }
 
   renderBanners(s);

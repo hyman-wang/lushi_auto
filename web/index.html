@@ -56,21 +56,29 @@ body{
 .pill.finished .dot{background:#7fb98a}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(99,199,111,.55)}70%{box-shadow:0 0 0 8px rgba(99,199,111,0)}100%{box-shadow:0 0 0 0 rgba(99,199,111,0)}}
 /* ============ 页面骨架 ============ */
-.page{max-width:1120px;margin:0 auto;padding:2px 22px 72px}
+.page{max-width:none;margin:0 auto;padding:0 18px 14px}
+.cols{column-count:4;column-gap:22px}
+.cols .group{break-inside:avoid;margin:0 0 9px}
+.bottom{margin-top:2px;border-top:1px solid var(--border-soft);padding-top:5px}
+.bottom .group{margin:0}
+@media (min-width:2100px){.cols{column-count:5;column-gap:26px}}
+@media (max-width:1200px){.cols{column-count:3}}
+@media (max-width:900px){.cols{column-count:2}}
+@media (max-width:640px){.cols{column-count:1}}
 #banners:empty{display:none}
-.group{margin-top:14px}
-.group-title{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;font-weight:700;letter-spacing:1.1px;color:var(--gold);padding:9px 2px 7px;border-bottom:1px solid var(--border);min-height:34px}
+.group{margin-top:0}
+.group-title{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--gold);padding:5px 2px 4px;border-bottom:1px solid var(--border);min-height:24px}
 .group-title .gt-tools{display:flex;align-items:center;gap:8px;font-weight:400;letter-spacing:0}
 /* ============ 行：左标题 / 右控件 ============ */
-.row{display:grid;grid-template-columns:minmax(170px,260px) minmax(0,1fr);gap:20px;align-items:center;padding:6px 2px;border-bottom:1px solid rgba(58,45,28,.5)}
+.row{display:grid;grid-template-columns:minmax(120px,1fr) auto;gap:10px;align-items:center;padding:3px 2px;border-bottom:1px solid rgba(58,45,28,.5)}
 .row:last-child{border-bottom:0}
-.row-label{font-size:13.5px;line-height:1.4;color:var(--text);min-width:0}
+.row-label{font-size:12.5px;line-height:1.3;color:var(--text);min-width:0}
 .row-desc{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45}
 .row-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;min-width:0}
-.row.block{grid-template-columns:1fr;gap:7px;align-items:start}
+.row.block{grid-template-columns:1fr;gap:5px;align-items:start}
 .row.block .row-control{justify-content:flex-start}
-.row-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:6px 2px 2px}
-.status{font-size:12.5px;color:var(--muted);line-height:1.4}
+.row-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:4px 2px 2px}
+.status{font-size:12px;color:var(--muted);line-height:1.35}
 @media (max-width:760px){
   .row{grid-template-columns:1fr;gap:5px;padding:8px 2px}
   .row-control{justify-content:flex-start}
@@ -78,35 +86,35 @@ body{
 }
 /* ============ 表单控件 ============ */
 input[type=text],input[type=number],input[type=datetime-local],select{
-  height:32px;background:#0f0b07;border:1px solid var(--border);color:var(--text);
-  border-radius:7px;padding:0 9px;font-size:13px;font-family:inherit;
+  height:27px;background:#0f0b07;border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:0 8px;font-size:12.5px;font-family:inherit;
   transition:border-color .15s,box-shadow .15s;
 }
 input[type=text]{width:100%;max-width:430px}
 .row-control input[type=text]{flex:1 1 220px;width:auto;min-width:0}
-input[type=number]{width:96px;text-align:right;font-variant-numeric:tabular-nums}
-input[type=datetime-local]{width:212px}
-select{min-width:150px;max-width:240px}
+input[type=number]{width:78px;text-align:right;font-variant-numeric:tabular-nums}
+input[type=datetime-local]{width:190px}
+select{min-width:132px;max-width:200px}
 input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,185,59,.13)}
 input:disabled,select:disabled{opacity:.4;cursor:not-allowed}
 /* 开关：纯 CSS，JS 直接读 input.checked，无需额外元素 */
 input[type=checkbox]{
   appearance:none;-webkit-appearance:none;flex:none;
-  width:40px;height:22px;border-radius:999px;background:#221a11;
+  width:34px;height:19px;border-radius:999px;background:#221a11;
   border:1px solid var(--border);position:relative;cursor:pointer;
   transition:background .15s,border-color .15s;vertical-align:middle;
 }
 input[type=checkbox]::after{
-  content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;
+  content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;
   border-radius:50%;background:#8b8071;transition:left .15s,background .15s;
 }
 input[type=checkbox]:checked{background:rgba(232,185,59,.24);border-color:var(--gold)}
-input[type=checkbox]:checked::after{left:20px;background:var(--gold-bright)}
+input[type=checkbox]:checked::after{left:17px;background:var(--gold-bright)}
 input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
 /* ============ 按钮 ============ */
-.btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 13px;
+.btn{display:inline-flex;align-items:center;justify-content:center;height:27px;padding:0 11px;
   border-radius:7px;border:1px solid transparent;background:transparent;color:var(--text);
-  font-size:13px;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;
+  font-size:12.5px;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;
   font-family:inherit;transition:all .15s}
 .btn:disabled{opacity:.35;cursor:not-allowed;filter:none;transform:none;box-shadow:none}
 .btn-primary{background:linear-gradient(180deg,#f2cd66,#d9a62e);color:#241a05;border-color:#8a6a1c}
@@ -117,8 +125,8 @@ input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
 .btn-warn:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 4px 16px rgba(226,168,78,.28)}
 .btn-ghost{background:transparent;color:var(--muted);border-color:var(--border)}
 .btn-ghost:hover:not(:disabled){color:var(--text);border-color:var(--gold)}
-.btn-big{height:36px;padding:0 18px;font-size:13.5px}
-.btn-small{height:26px;padding:0 9px;font-size:11.5px;font-weight:500}
+.btn-big{height:30px;padding:0 14px;font-size:13px}
+.btn-small{height:21px;padding:0 8px;font-size:11px;font-weight:500}
 .btn-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 /* ============ 说明折叠 ============ */
 body.hide-desc .desc{display:none}
@@ -247,7 +255,7 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
 .check-label{color:var(--text);font-weight:600}
 .check-detail{color:var(--muted);word-break:break-word}
 .check-hint{grid-column:2 / -1;color:var(--amber);font-size:12px}
-.log-box{height:320px;border-radius:8px}
+.log-box{height:150px;border-radius:8px}
 .chip{padding:3px 10px;font-size:12px;border-radius:999px}
 .countdown-row{display:flex;gap:8px;flex-wrap:wrap;margin:0}
 .surrender-decks{margin-top:4px}
@@ -282,339 +290,604 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
 
 <main class="page">
   <div id="banners"></div>
-  <section class="group">
-    <h2 class="group-title">对战</h2>
-    <div class="row">
-      <div class="row-label">操作</div>
-      <div class="row-control">
-        <button id="btnStart" class="btn btn-primary btn-big" type="button">⚔️ 开始运行</button>
-        <button id="btnOverlay" class="btn" type="button">🪟 日志浮窗（关）</button>
-        <button id="btnAfterGame" class="btn btn-warn" type="button" disabled>本局结束后停止</button>
-        <button id="btnStopNow" class="btn btn-danger" type="button" disabled>立即停止</button>
-      </div>
-    </div>
-    <div class="row-note desc">🪄 点「开始运行」只会打开日志浮窗、把炉石切到前台，<b>不会自动开打</b>；就绪后按钮变为「开始对战」，再点一次（二次确认后）才真正开始。⌨️ 快捷键 Ctrl+Q 可随时立即停止自动化。<br>🖥️ 炉石请使用 <b>全屏模式</b>（设置 → 选项 → 显示 → 全屏），<b>不要用「最大化窗口」</b>：最大化时窗口坐标与 1920×1080 全屏不一致，硬编码的点击坐标会整体偏移——下随从因有吸附还能成功，法术指定目标则会一直失败重试。<br>♻ 浮窗上的「重启炉石」会先弹确认，再执行「停自动化 → 结束 Hearthstone.exe → 清空日志目录（保留 Log.config）→ 重新启动炉石」，并<b>等到认出主界面才算成功</b>。<br>🚪「退出浮窗」只关窗口、脚本继续跑；<b>关掉浮窗会回到未就绪</b>状态（大按钮变回「开始运行（准备）」），再点「开始运行」把浮窗开出来即可。</div>
-  </section>
 
-  <section class="group">
-    <h2 class="group-title">账号</h2>
-    <div class="row">
-      <div class="row-label">用户 ID（战网完整昵称）<span class="row-desc desc">必须含 <b>#编号</b>，否则分不清敌我，会一直不出牌</span></div>
-      <div class="row-control"><input id="inpName" type="text" placeholder="昵称#12345"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">炉石日志目录（Logs）<span class="row-desc desc">通常是炉石安装目录下的 Logs 文件夹</span></div>
-      <div class="row-control">
-        <input id="inpLog" type="text" placeholder="D:\Hearthstone\Logs">
-        <button id="btnCheckLog" class="btn btn-ghost" type="button">检测</button>
-      </div>
-    </div>
-    <div class="row block">
-      <div class="row-label">账号校验</div>
-      <div class="row-control" style="justify-content:flex-start"><span class="status" id="nameMatch">等待读到对局日志中的玩家名…</span></div>
-    </div>
-    <div class="row block">
-      <div class="row-control" style="justify-content:flex-start"><span class="status" id="logHint"></span></div>
-    </div>
-    <div class="row-note desc">💡 输入框失焦即自动保存；自动化运行期间不可修改。</div>
-  </section>
+  <div class="cols">
+      <section class="group">
 
-  <section class="group">
-    <h2 class="group-title">定时任务</h2>
-    <div class="row">
-      <div class="row-label">开始时间<span class="row-desc desc">不能早于当前时间</span></div>
-      <div class="row-control"><input id="inpStart" type="datetime-local"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">结束时间<span class="row-desc desc">留空则一直运行；到点先打完本局再停</span></div>
-      <div class="row-control"><input id="inpEnd" type="datetime-local"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">计划</div>
-      <div class="row-control">
-        <span class="countdown-row" id="countdownRow" style="display:none">
-          <span class="chip" id="chipStart">距开始 --</span>
-          <span class="chip amber" id="chipEnd">距结束 --</span>
-        </span>
-        <button id="btnSchedule" class="btn btn-primary" type="button">💾 保存</button>
-        <button id="btnCancelSched" class="btn btn-ghost" type="button" disabled>取消计划</button>
-      </div>
-    </div>
-  </section>
+        <h2 class="group-title">对战</h2>
 
-  <section class="group">
-    <h2 class="group-title">存活检测</h2>
-    <div class="row">
-      <div class="row-label">启用<span class="row-desc desc">进程消失或日志长时间不动时告警并停止</span></div>
-      <div class="row-control"><input id="chkLiveness" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">停滞告警（秒）</div>
-      <div class="row-control"><input id="inpLvWarn" type="number" min="1" max="3600" step="10"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">停滞自动停止（秒）</div>
-      <div class="row-control"><input id="inpLvStop" type="number" min="1" max="7200" step="10"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">状态</div>
-      <div class="row-control"><span class="status" id="livenessStatus">等待检测…</span></div>
-    </div>
-    <div class="row">
-      <div class="row-label"></div>
-      <div class="row-control"><button id="btnSaveLiveness" class="btn btn-ghost" type="button">💾 保存存活检测</button></div>
-    </div>
-    <div class="row-note desc">挂机最怕「炉石已经没了，脚本还在对着失效画面做 OCR」。开启后每轮都会确认 Hearthstone.exe 是否还在、对局中 Power.log 是否还在更新，判定退出就告警并停止自动化。默认开启。</div>
-  </section>
+        <div class="row">
 
-  <section class="group">
-    <h2 class="group-title">中断重启</h2>
-    <div class="row">
-      <div class="row-label">启用<span class="row-desc desc">日志停滞就重启炉石并重开一局</span></div>
-      <div class="row-control"><input id="chkWatchdog" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">停滞多久算卡住（秒）</div>
-      <div class="row-control"><input id="inpWdStale" type="number" min="30" max="3600" step="30"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">最多重启次数<span class="row-desc desc">10 分钟内超过就停止并告警</span></div>
-      <div class="row-control"><input id="inpWdMax" type="number" min="1" max="20" step="1"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">状态</div>
-      <div class="row-control"><span class="status" id="watchdogStatus">等待检测…</span></div>
-    </div>
-    <div class="row">
-      <div class="row-label"></div>
-      <div class="row-control"><button id="btnSaveWatchdog" class="btn btn-ghost" type="button">💾 保存中断重启</button></div>
-    </div>
-    <div class="row-note desc">打开后日志停滞交给它「重启炉石 → 等主界面 → 重新进入对战」，存活检测的「自动停止」不再触发；只在自动化运行中判定，主界面发呆不会误重启。</div>
-  </section>
+          <div class="row-label">操作</div>
 
-  <section class="group">
-    <h2 class="group-title">自动投降</h2>
-    <div class="row">
-      <div class="row-label">启用<span class="row-desc desc">盒子 AI 胜率连续低于阈值就认输</span></div>
-      <div class="row-control"><input id="chkConcede" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">AI 胜率阈值（%）</div>
-      <div class="row-control"><input id="inpConcedeThreshold" type="number" min="0" max="100" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">连续回合数</div>
-      <div class="row-control"><input id="inpConcedeRounds" type="number" min="1" max="50" step="1"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">状态</div>
-      <div class="row-control"><span class="status" id="concedeDetect">等待自动化运行…</span></div>
-    </div>
-    <div class="row">
-      <div class="row-label"></div>
-      <div class="row-control"><button id="btnSaveConcede" class="btn btn-warn" type="button">💾 保存自动投降</button></div>
-    </div>
-    <div class="row-note desc">检测左上角盒子「AI胜率」，连续 N 回合低于阈值时执行：右下角齿轮 → 中间红色「认输」。默认关闭。</div>
-  </section>
+          <div class="row-control">
 
-  <section class="group" id="cardRank">
-    <h2 class="group-title">段位目标</h2>
-    <div class="row">
-      <div class="row-label">启用</div>
-      <div class="row-control"><input id="chkRankStop" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">判定方式</div>
-      <div class="row-control">
-        <select id="inpRankMode">
-          <option value="legend">上传说就停</option>
-          <option value="legend_number">指定传说名次</option>
-        </select>
-      </div>
-    </div>
-    <div class="row">
-      <div class="row-label">传说名次<span class="row-desc desc">数值越小名次越高</span></div>
-      <div class="row-control"><input id="inpRankNumber" type="number" min="1" max="100000" step="1"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">到该名次后</div>
-      <div class="row-control">
-        <select id="inpRankAction">
-          <option value="stop">达到后停止（上分停止）</option>
-          <option value="keep">控分（不超过该名次）</option>
-        </select>
-      </div>
-    </div>
-    <div class="row">
-      <div class="row-label">状态</div>
-      <div class="row-control"><span class="status" id="rankStopStatus">等待自动化运行…</span></div>
-    </div>
-    <div class="row">
-      <div class="row-label"></div>
-      <div class="row-control"><button id="btnSaveRankStop" class="btn btn-warn" type="button">💾 保存段位目标</button></div>
-    </div>
-    <div class="row-note desc">只在「选择套牌」界面读一次右上角名次。<b>达到后停止</b>：名次 ≤ 目标 → 本局结束后停；<b>控分</b>：名次 &lt; 目标 → 开局即投降，压到不超目标再正常打（单次最多 40 局）。默认关闭。</div>
-  </section>
+            <button id="btnStart" class="btn btn-primary btn-big" type="button">⚔️ 开始运行</button>
 
-  <section class="group" id="cardSurrender" data-collapsible="1">
-    <h2 class="card-title">
-      <span>卡组识别投降</span>
-      <label class="row-control" style="font-size:12px;gap:6px;color:var(--text)">
-        <span style="font-weight:400">启用</span>
-        <input id="chkSurrender" type="checkbox">
-      </label>
-    </h2>
-    <div class="row block">
-      <div class="row-control" style="width:100%;flex-direction:column;align-items:stretch;gap:8px">
-        <div id="surrenderDecks" class="surrender-decks"></div>
-        <div class="btn-row">
-          <button id="btnAddSurrenderDeck" class="btn btn-ghost btn-small" type="button">+ 添加卡组</button>
-          <button id="btnToggleSurrenderJson" class="btn btn-ghost btn-small" type="button">⚙ 高级 JSON</button>
-          <button id="btnSaveSurrender" class="btn btn-warn" type="button">💾 保存卡组识别</button>
-        </div>
-        <div id="surrenderJsonWrap" class="surrender-json" style="display:none">
-          <textarea id="surrenderJson" spellcheck="false"></textarea>
-          <div class="btn-row">
-            <button id="btnApplySurrenderJson" class="btn btn-ghost btn-small" type="button">把 JSON 载入到表单</button>
+            <button id="btnOverlay" class="btn" type="button">🪟 日志浮窗（关）</button>
+
+            <button id="btnAfterGame" class="btn btn-warn" type="button" disabled>本局结束后停止</button>
+
+            <button id="btnStopNow" class="btn btn-danger" type="button" disabled>立即停止</button>
+
           </div>
-          <div class="row-note">表单支持多层「且 / 或 / 非」；表单表达不了的字段（<code>turn</code> / <code>card_type</code> / <code>at_least</code>）会标成「高级」并原样保留。</div>
+
         </div>
-        <div class="surrender-status" id="surrenderStatus">状态：等待自动化运行…</div>
-      </div>
-    </div>
-    <div class="row-note desc">按「对方有哪些卡」识别卡组，命中就立刻投降：卡名输入中文会弹候选；每组可选且/或/非并多层嵌套；所有条件只判对方。点右上「展开」编辑。</div>
-  </section>
 
-  <section class="group" id="cardHuman">
-    <h2 class="group-title">活人感</h2>
-    <div class="row">
-      <div class="row-label">启用</div>
-      <div class="row-control"><input id="chkHumanLike" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">看卡牌<span class="row-desc desc">延时期间在手牌区随手停</span></div>
-      <div class="row-control"><input id="chkHlHand" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">随机延时下限（秒）</div>
-      <div class="row-control"><input id="inpHlMin" type="number" min="0" max="60" step="0.1"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">随机延时上限（秒）</div>
-      <div class="row-control"><input id="inpHlMax" type="number" min="0" max="60" step="0.1"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">每处悬停下限（秒）</div>
-      <div class="row-control"><input id="inpHlHoverMin" type="number" min="0.05" max="30" step="0.05"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">每处悬停上限（秒）</div>
-      <div class="row-control"><input id="inpHlHoverMax" type="number" min="0.05" max="30" step="0.05"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">看随从<span class="row-desc desc">对手新随从出现时看一眼</span></div>
-      <div class="row-control"><input id="chkHlMinion" type="checkbox"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">随从悬停下限（秒）</div>
-      <div class="row-control"><input id="inpHlMinionMin" type="number" min="0.05" max="30" step="0.05"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">随从悬停上限（秒）</div>
-      <div class="row-control"><input id="inpHlMinionMax" type="number" min="0.05" max="30" step="0.05"></div>
-    </div>
-    <div class="row">
-      <div class="row-label"></div>
-      <div class="row-control"><button id="btnSaveHumanLike" class="btn btn-ghost" type="button">💾 保存活人感</button></div>
-    </div>
-    <div class="row-note desc">全程只移动鼠标、绝不点击：操作后先随机等一段再出牌，等待期间在手牌区随手停；对手新随从出现时悬停一下。关掉「看卡牌」连随机延时一起取消，回到固定延时。默认关闭，下一局生效。</div>
-  </section>
+        <div class="row-note desc">🪄 点「开始运行」只会打开日志浮窗、把炉石切到前台，<b>不会自动开打</b>；就绪后按钮变为「开始对战」，再点一次（二次确认后）才真正开始。⌨️ 快捷键 Ctrl+Q 可随时立即停止自动化。<br>🖥️ 炉石请使用 <b>全屏模式</b>（设置 → 选项 → 显示 → 全屏），<b>不要用「最大化窗口」</b>：最大化时窗口坐标与 1920×1080 全屏不一致，硬编码的点击坐标会整体偏移——下随从因有吸附还能成功，法术指定目标则会一直失败重试。<br>♻ 浮窗上的「重启炉石」会先弹确认，再执行「停自动化 → 结束 Hearthstone.exe → 清空日志目录（保留 Log.config）→ 重新启动炉石」，并<b>等到认出主界面才算成功</b>。<br>🚪「退出浮窗」只关窗口、脚本继续跑；<b>关掉浮窗会回到未就绪</b>状态（大按钮变回「开始运行（准备）」），再点「开始运行」把浮窗开出来即可。</div>
 
-  <section class="group" id="cardDelay">
-    <h2 class="group-title">延时</h2>
-    <div class="row">
-      <div class="row-label">换牌前等待（秒）</div>
-      <div class="row-control"><input id="inpReadyDelay" type="number" min="0" max="120" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">识别后缓冲（秒）<span class="row-desc desc">换牌识别成功到点击之间</span></div>
-      <div class="row-control"><input id="inpPostOcrDelay" type="number" min="0" max="30" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">换牌重试间隔（秒）</div>
-      <div class="row-control"><input id="inpRetryDelay" type="number" min="0" max="60" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">每张开局卡延时（秒）</div>
-      <div class="row-control"><input id="inpFirstTurnPerCard" type="number" min="0" max="20" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">每回合前延时（秒）</div>
-      <div class="row-control"><input id="inpPreDelay" type="number" min="0" max="60" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">操作后延时（秒）</div>
-      <div class="row-control"><input id="inpPostDelay" type="number" min="0" max="10" step="0.25"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">抽牌额外延时（秒/张）<span class="row-desc desc">回合内抽到牌时每张额外等待；回合开始那 1 张常规抽牌不算</span></div>
-      <div class="row-control"><input id="inpDrawDelay" type="number" min="0" max="20" step="0.5"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">抉择/发现选目标延时（秒）</div>
-      <div class="row-control"><input id="inpChoiceTargetDelay" type="number" min="0" max="5" step="0.1"></div>
-    </div>
-    <div class="row">
-      <div class="row-label">OCR 缩放<span class="row-desc desc">精度/速度平衡点</span></div>
-      <div class="row-control"><input id="inpOcrScale" type="number" min="0.5" max="4" step="0.1"></div>
-    </div>
-    <div class="row block">
-      <div class="row-label">当前时序</div>
-      <div class="row-control" style="justify-content:flex-start"><span class="status" id="delayHint">由服务端配置返回</span></div>
-    </div>
-    <div class="row">
-      <div class="row-label"></div>
-      <div class="row-control"><button id="btnSaveDelays" class="btn btn-ghost" type="button">💾 保存延时</button></div>
-    </div>
-  </section>
+      </section>
 
-  <section class="group" id="cardRegions">
-    <h2 class="group-title">校准</h2>
-    <div class="row">
-      <div class="row-label">屏幕校准窗口<span class="row-desc desc">13 个目标都能拖：推荐面板、换牌确认、AI 胜率、结算开始、段位、模式按钮…</span></div>
-      <div class="row-control"><button id="btnCalibrate" class="btn btn-ghost" type="button">📐 打开校准窗口</button></div>
-    </div>
-    <div class="row-note desc">自动化没跑时打开：屏幕上只画当前目标那一个框 + 屏幕正中央的目标条 + 右侧推荐区域实时 OCR 预览，并提示<b>「请对齐相应UI」</b>。<b>Tab</b> 切换目标、拖框/拖手柄改位置大小、<b>S</b> 保存、<b>Esc</b> 退出。框外画面<b>鼠标穿透</b>，可边看游戏边调。拖动/缩放炉石窗口时框会实时跟着走，校准一次即可。<br>🎯 13 个目标：<b>盒子推荐面板</b>、换牌推荐面板（最多 4 张留牌）、<b>换牌确认按钮</b>、<b>AI胜率浮动条</b>（兜底区域自动跟着外扩）、结算「开始」按钮、段位数字、主界面「传统对战」、选择套牌标题、9 个卡组、四个模式盾牌（狂野/标准/休闲）；✛ <b>阶段判定点</b>是只读参考，点不到炉石的地方照常点得到。<br>🧭 右上角<b>日志浮窗</b>的<b>「校准」</b>按钮打开的是同一个窗口（再点一次收起）。</div>
-  </section>
+      <section class="group">
 
-  <section class="group" id="cardSelfcheck">
-    <h2 class="group-title">
-      <span>环境自检</span>
-      <span class="gt-tools">
-        <span id="selfcheckBadge" class="chip">自检中…</span>
-        <button id="btnSelfcheck" class="btn btn-ghost btn-small" type="button">重新自检</button>
-        <button id="btnSelfcheckToggle" class="btn btn-ghost btn-small" type="button">收起</button>
-      </span>
-    </h2>
-    <div id="selfcheckSummary" class="status" style="padding:7px 2px 0">正在自检：Python 版本 / 依赖包 / 分辨率与缩放…</div>
-    <div id="selfcheckBody">
-      <div id="selfcheckList" class="check-list"></div>
-      <div class="row-note desc">脚本第一次启动时会自动自检一遍，这里显示的就是那次结果，随时可点 [重新自检] 重跑。✅ 达标 · ⚠️ 与推荐值不同（还能跑）· ❌ 缺失或不满足（必须修）。<b>Python 必须是 3.12 的 64 位版本</b>：项目实测基线是 3.12，OCR 后端（RapidOCR + ONNX Runtime）也只在这个环境验证过，3.13+ 与 3.11 及以下均未在实测范围内（推荐 <code>conda create -n HTL python=3.12 -y</code>）。</div>
-    </div>
-  </section>
+        <h2 class="group-title">账号</h2>
 
-  <section class="group">
-    <h2 class="group-title">
-      <span>实时日志</span>
-      <span class="gt-tools">
-        <label class="row-control" style="font-size:12px;gap:6px;color:var(--muted)">
-          <input type="checkbox" id="chkAutoscroll" checked>自动滚动
-        </label>
-        <button id="btnClearLog" class="btn btn-ghost btn-small" type="button">清空</button>
-      </span>
-    </h2>
-    <div id="logBox" class="log-box" style="margin-top:8px"></div>
-  </section>
+        <div class="row">
+
+          <div class="row-label">用户 ID（战网完整昵称）<span class="row-desc desc">必须含 <b>#编号</b>，否则分不清敌我，会一直不出牌</span></div>
+
+          <div class="row-control"><input id="inpName" type="text" placeholder="昵称#12345"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">炉石日志目录（Logs）<span class="row-desc desc">通常是炉石安装目录下的 Logs 文件夹</span></div>
+
+          <div class="row-control">
+
+            <input id="inpLog" type="text" placeholder="D:\Hearthstone\Logs">
+
+            <button id="btnCheckLog" class="btn btn-ghost" type="button">检测</button>
+
+          </div>
+
+        </div>
+
+        <div class="row block">
+
+          <div class="row-label">账号校验</div>
+
+          <div class="row-control" style="justify-content:flex-start"><span class="status" id="nameMatch">等待读到对局日志中的玩家名…</span></div>
+
+        </div>
+
+        <div class="row block">
+
+          <div class="row-control" style="justify-content:flex-start"><span class="status" id="logHint"></span></div>
+
+        </div>
+
+        <div class="row-note desc">💡 输入框失焦即自动保存；自动化运行期间不可修改。</div>
+
+      </section>
+
+      <section class="group">
+
+        <h2 class="group-title">定时任务</h2>
+
+        <div class="row">
+
+          <div class="row-label">开始时间<span class="row-desc desc">不能早于当前时间</span></div>
+
+          <div class="row-control"><input id="inpStart" type="datetime-local"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">结束时间<span class="row-desc desc">留空则一直运行；到点先打完本局再停</span></div>
+
+          <div class="row-control"><input id="inpEnd" type="datetime-local"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">计划</div>
+
+          <div class="row-control">
+
+            <span class="countdown-row" id="countdownRow" style="display:none">
+
+              <span class="chip" id="chipStart">距开始 --</span>
+
+              <span class="chip amber" id="chipEnd">距结束 --</span>
+
+            </span>
+
+            <button id="btnSchedule" class="btn btn-primary" type="button">💾 保存</button>
+
+            <button id="btnCancelSched" class="btn btn-ghost" type="button" disabled>取消计划</button>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <section class="group">
+
+        <h2 class="group-title"><span>存活检测</span><span class="gt-tools"><button id="btnSaveLiveness" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+
+        <div class="row">
+
+          <div class="row-label">启用<span class="row-desc desc">进程消失或日志长时间不动时告警并停止</span></div>
+
+          <div class="row-control"><input id="chkLiveness" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">停滞告警（秒）</div>
+
+          <div class="row-control"><input id="inpLvWarn" type="number" min="1" max="3600" step="10"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">停滞自动停止（秒）</div>
+
+          <div class="row-control"><input id="inpLvStop" type="number" min="1" max="7200" step="10"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">状态</div>
+
+          <div class="row-control"><span class="status" id="livenessStatus">等待检测…</span></div>
+
+        </div>
+
+        <div class="row-note desc">挂机最怕「炉石已经没了，脚本还在对着失效画面做 OCR」。开启后每轮都会确认 Hearthstone.exe 是否还在、对局中 Power.log 是否还在更新，判定退出就告警并停止自动化。默认开启。</div>
+
+      </section>
+
+      <section class="group">
+
+        <h2 class="group-title"><span>中断重启</span><span class="gt-tools"><button id="btnSaveWatchdog" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+
+        <div class="row">
+
+          <div class="row-label">启用<span class="row-desc desc">日志停滞就重启炉石并重开一局</span></div>
+
+          <div class="row-control"><input id="chkWatchdog" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">停滞多久算卡住（秒）</div>
+
+          <div class="row-control"><input id="inpWdStale" type="number" min="30" max="3600" step="30"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">最多重启次数<span class="row-desc desc">10 分钟内超过就停止并告警</span></div>
+
+          <div class="row-control"><input id="inpWdMax" type="number" min="1" max="20" step="1"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">状态</div>
+
+          <div class="row-control"><span class="status" id="watchdogStatus">等待检测…</span></div>
+
+        </div>
+
+        <div class="row-note desc">打开后日志停滞交给它「重启炉石 → 等主界面 → 重新进入对战」，存活检测的「自动停止」不再触发；只在自动化运行中判定，主界面发呆不会误重启。</div>
+
+      </section>
+
+      <section class="group">
+
+        <h2 class="group-title"><span>自动投降</span><span class="gt-tools"><button id="btnSaveConcede" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+
+        <div class="row">
+
+          <div class="row-label">启用<span class="row-desc desc">盒子 AI 胜率连续低于阈值就认输</span></div>
+
+          <div class="row-control"><input id="chkConcede" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">AI 胜率阈值（%）</div>
+
+          <div class="row-control"><input id="inpConcedeThreshold" type="number" min="0" max="100" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">连续回合数</div>
+
+          <div class="row-control"><input id="inpConcedeRounds" type="number" min="1" max="50" step="1"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">状态</div>
+
+          <div class="row-control"><span class="status" id="concedeDetect">等待自动化运行…</span></div>
+
+        </div>
+
+        <div class="row-note desc">检测左上角盒子「AI胜率」，连续 N 回合低于阈值时执行：右下角齿轮 → 中间红色「认输」。默认关闭。</div>
+
+      </section>
+
+      <section class="group" id="cardRank">
+
+        <h2 class="group-title"><span>段位目标</span><span class="gt-tools"><button id="btnSaveRankStop" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+
+        <div class="row">
+
+          <div class="row-label">启用</div>
+
+          <div class="row-control"><input id="chkRankStop" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">判定方式</div>
+
+          <div class="row-control">
+
+            <select id="inpRankMode">
+
+              <option value="legend">上传说就停</option>
+
+              <option value="legend_number">指定传说名次</option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">传说名次<span class="row-desc desc">数值越小名次越高</span></div>
+
+          <div class="row-control"><input id="inpRankNumber" type="number" min="1" max="100000" step="1"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">到该名次后</div>
+
+          <div class="row-control">
+
+            <select id="inpRankAction">
+
+              <option value="stop">达到后停止（上分停止）</option>
+
+              <option value="keep">控分（不超过该名次）</option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">状态</div>
+
+          <div class="row-control"><span class="status" id="rankStopStatus">等待自动化运行…</span></div>
+
+        </div>
+
+        <div class="row-note desc">只在「选择套牌」界面读一次右上角名次。<b>达到后停止</b>：名次 ≤ 目标 → 本局结束后停；<b>控分</b>：名次 &lt; 目标 → 开局即投降，压到不超目标再正常打（单次最多 40 局）。默认关闭。</div>
+
+      </section>
+
+      <section class="group" id="cardSurrender" data-collapsible="1">
+
+        <h2 class="card-title">
+
+          <span>卡组识别投降</span>
+
+          <label class="row-control" style="font-size:12px;gap:6px;color:var(--text)">
+
+            <span style="font-weight:400">启用</span>
+
+            <input id="chkSurrender" type="checkbox">
+
+          </label>
+
+        </h2>
+
+        <div class="row block">
+
+          <div class="row-control" style="width:100%;flex-direction:column;align-items:stretch;gap:8px">
+
+            <div id="surrenderDecks" class="surrender-decks"></div>
+
+            <div class="btn-row">
+
+              <button id="btnAddSurrenderDeck" class="btn btn-ghost btn-small" type="button">+ 添加卡组</button>
+
+              <button id="btnToggleSurrenderJson" class="btn btn-ghost btn-small" type="button">⚙ 高级 JSON</button>
+
+              <button id="btnSaveSurrender" class="btn btn-warn" type="button">💾 保存卡组识别</button>
+
+            </div>
+
+            <div id="surrenderJsonWrap" class="surrender-json" style="display:none">
+
+              <textarea id="surrenderJson" spellcheck="false"></textarea>
+
+              <div class="btn-row">
+
+                <button id="btnApplySurrenderJson" class="btn btn-ghost btn-small" type="button">把 JSON 载入到表单</button>
+
+              </div>
+
+              <div class="row-note">表单支持多层「且 / 或 / 非」；表单表达不了的字段（<code>turn</code> / <code>card_type</code> / <code>at_least</code>）会标成「高级」并原样保留。</div>
+
+            </div>
+
+            <div class="surrender-status" id="surrenderStatus">状态：等待自动化运行…</div>
+
+          </div>
+
+        </div>
+
+        <div class="row-note desc">按「对方有哪些卡」识别卡组，命中就立刻投降：卡名输入中文会弹候选；每组可选且/或/非并多层嵌套；所有条件只判对方。点右上「展开」编辑。</div>
+
+      </section>
+
+      <section class="group" id="cardHuman">
+
+        <h2 class="group-title"><span>活人感</span><span class="gt-tools"><button id="btnSaveHumanLike" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+
+        <div class="row">
+
+          <div class="row-label">启用</div>
+
+          <div class="row-control"><input id="chkHumanLike" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">看卡牌<span class="row-desc desc">延时期间在手牌区随手停</span></div>
+
+          <div class="row-control"><input id="chkHlHand" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">随机延时下限（秒）</div>
+
+          <div class="row-control"><input id="inpHlMin" type="number" min="0" max="60" step="0.1"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">随机延时上限（秒）</div>
+
+          <div class="row-control"><input id="inpHlMax" type="number" min="0" max="60" step="0.1"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">每处悬停下限（秒）</div>
+
+          <div class="row-control"><input id="inpHlHoverMin" type="number" min="0.05" max="30" step="0.05"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">每处悬停上限（秒）</div>
+
+          <div class="row-control"><input id="inpHlHoverMax" type="number" min="0.05" max="30" step="0.05"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">看随从<span class="row-desc desc">对手新随从出现时看一眼</span></div>
+
+          <div class="row-control"><input id="chkHlMinion" type="checkbox"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">随从悬停下限（秒）</div>
+
+          <div class="row-control"><input id="inpHlMinionMin" type="number" min="0.05" max="30" step="0.05"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">随从悬停上限（秒）</div>
+
+          <div class="row-control"><input id="inpHlMinionMax" type="number" min="0.05" max="30" step="0.05"></div>
+
+        </div>
+
+        <div class="row-note desc">全程只移动鼠标、绝不点击：操作后先随机等一段再出牌，等待期间在手牌区随手停；对手新随从出现时悬停一下。关掉「看卡牌」连随机延时一起取消，回到固定延时。默认关闭，下一局生效。</div>
+
+      </section>
+
+      <section class="group" id="cardDelay">
+
+        <h2 class="group-title"><span>延时</span><span class="gt-tools"><button id="btnSaveDelays" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+
+        <div class="row">
+
+          <div class="row-label">换牌前等待（秒）</div>
+
+          <div class="row-control"><input id="inpReadyDelay" type="number" min="0" max="120" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">识别后缓冲（秒）<span class="row-desc desc">换牌识别成功到点击之间</span></div>
+
+          <div class="row-control"><input id="inpPostOcrDelay" type="number" min="0" max="30" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">换牌重试间隔（秒）</div>
+
+          <div class="row-control"><input id="inpRetryDelay" type="number" min="0" max="60" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">每张开局卡延时（秒）</div>
+
+          <div class="row-control"><input id="inpFirstTurnPerCard" type="number" min="0" max="20" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">每回合前延时（秒）</div>
+
+          <div class="row-control"><input id="inpPreDelay" type="number" min="0" max="60" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">操作后延时（秒）</div>
+
+          <div class="row-control"><input id="inpPostDelay" type="number" min="0" max="10" step="0.25"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">抽牌额外延时（秒/张）<span class="row-desc desc">回合内抽到牌时每张额外等待；回合开始那 1 张常规抽牌不算</span></div>
+
+          <div class="row-control"><input id="inpDrawDelay" type="number" min="0" max="20" step="0.5"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">抉择/发现选目标延时（秒）</div>
+
+          <div class="row-control"><input id="inpChoiceTargetDelay" type="number" min="0" max="5" step="0.1"></div>
+
+        </div>
+
+        <div class="row">
+
+          <div class="row-label">OCR 缩放<span class="row-desc desc">精度/速度平衡点</span></div>
+
+          <div class="row-control"><input id="inpOcrScale" type="number" min="0.5" max="4" step="0.1"></div>
+
+        </div>
+
+        <div class="row block">
+
+          <div class="row-label">当前时序</div>
+
+          <div class="row-control" style="justify-content:flex-start"><span class="status" id="delayHint">由服务端配置返回</span></div>
+
+        </div>
+
+      </section>
+
+      <section class="group" id="cardRegions">
+
+        <h2 class="group-title">校准</h2>
+
+        <div class="row">
+
+          <div class="row-label">屏幕校准窗口<span class="row-desc desc">13 个目标都能拖：推荐面板、换牌确认、AI 胜率、结算开始、段位、模式按钮…</span></div>
+
+          <div class="row-control"><button id="btnCalibrate" class="btn btn-ghost" type="button">📐 打开校准窗口</button></div>
+
+        </div>
+
+        <div class="row-note desc">自动化没跑时打开：屏幕上只画当前目标那一个框 + 屏幕正中央的目标条 + 右侧推荐区域实时 OCR 预览，并提示<b>「请对齐相应UI」</b>。<b>Tab</b> 切换目标、拖框/拖手柄改位置大小、<b>S</b> 保存、<b>Esc</b> 退出。框外画面<b>鼠标穿透</b>，可边看游戏边调。拖动/缩放炉石窗口时框会实时跟着走，校准一次即可。<br>🎯 13 个目标：<b>盒子推荐面板</b>、换牌推荐面板（最多 4 张留牌）、<b>换牌确认按钮</b>、<b>AI胜率浮动条</b>（兜底区域自动跟着外扩）、结算「开始」按钮、段位数字、主界面「传统对战」、选择套牌标题、9 个卡组、四个模式盾牌（狂野/标准/休闲）；✛ <b>阶段判定点</b>是只读参考，点不到炉石的地方照常点得到。<br>🧭 右上角<b>日志浮窗</b>的<b>「校准」</b>按钮打开的是同一个窗口（再点一次收起）。</div>
+
+      </section>
+  </div>
+
+  <div class="bottom">
+      <section class="group" id="cardSelfcheck">
+
+        <h2 class="group-title">
+
+          <span>环境自检</span>
+
+          <span class="gt-tools">
+
+            <span id="selfcheckBadge" class="chip">自检中…</span>
+
+            <button id="btnSelfcheck" class="btn btn-ghost btn-small" type="button">重新自检</button>
+
+            <button id="btnSelfcheckToggle" class="btn btn-ghost btn-small" type="button">收起</button>
+
+          </span>
+
+        </h2>
+
+        <div id="selfcheckSummary" class="status" style="padding:7px 2px 0">正在自检：Python 版本 / 依赖包 / 分辨率与缩放…</div>
+
+        <div id="selfcheckBody">
+
+          <div id="selfcheckList" class="check-list"></div>
+
+          <div class="row-note desc">脚本第一次启动时会自动自检一遍，这里显示的就是那次结果，随时可点 [重新自检] 重跑。✅ 达标 · ⚠️ 与推荐值不同（还能跑）· ❌ 缺失或不满足（必须修）。<b>Python 必须是 3.12 的 64 位版本</b>：项目实测基线是 3.12，OCR 后端（RapidOCR + ONNX Runtime）也只在这个环境验证过，3.13+ 与 3.11 及以下均未在实测范围内（推荐 <code>conda create -n HTL python=3.12 -y</code>）。</div>
+
+        </div>
+
+      </section>
+
+      <section class="group">
+
+        <h2 class="group-title">
+
+          <span>实时日志</span>
+
+          <span class="gt-tools">
+
+            <label class="row-control" style="font-size:12px;gap:6px;color:var(--muted)">
+
+              <input type="checkbox" id="chkAutoscroll" checked>自动滚动
+
+            </label>
+
+            <button id="btnClearLog" class="btn btn-ghost btn-small" type="button">清空</button>
+
+          </span>
+
+        </h2>
+
+        <div id="logBox" class="log-box" style="margin-top:8px"></div>
+
+      </section>
+  </div>
 
   <div class="footer">HSLegendArriver · 仅用于技术研究与代码交流 · <a href="https://github.com/hyman-wang/lushi_auto" target="_blank" rel="noopener noreferrer">github.com/hyman-wang/lushi_auto</a></div>
 </main>
@@ -1190,15 +1463,14 @@ function renderSelfcheck(res){
   var badge = $("selfcheckBadge");
   badge.textContent = res.ok ? "✅ 自检通过" : "❌ " + res.failed + " 项待修";
   badge.className = "chip" + (res.ok ? "" : " amber");
-  /* 有 ❌ 时自动展开；通过时默认折叠，只留一行徽标。用户手动展开后本轮不再强制折叠。 */
+  /* 一屏原则：不论通过与否都默认折叠，只留一行徽标；有问题看顶部横幅，点「展开」再看细节。
+     用户手动展开/收起后，本轮轮询不再强制改回。 */
   var isOk = !!res.ok;
   if (selfcheckLastOk !== null && selfcheckLastOk !== isOk) {
     selfcheckUserToggled = false;
   }
   selfcheckLastOk = isOk;
-  if (!isOk) {
-    setSelfcheckCollapsed(false, false);
-  } else if (!selfcheckUserToggled) {
+  if (!selfcheckUserToggled) {
     setSelfcheckCollapsed(true, false);
   }
 }

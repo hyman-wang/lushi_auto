@@ -46,7 +46,7 @@ def focus_existing_window() -> bool:
     return True
 
 
-def run(url: str, width: int = 1500, height: int = 1100) -> bool:
+def run(url: str, width: int = 1680, height: int = 1120) -> bool:
     """打开唯一的应用窗口并阻塞到用户关闭它。
 
     成功打开并关闭返回 True；pywebview / WebView2 不可用时返回 False，

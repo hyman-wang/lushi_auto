@@ -5,262 +5,232 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HSLegendArriver · 自动对战控制台</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
-<style>/* ============ 基础 ============ */
+<style>
+/* ================= 设计令牌（冷色 / 高对比） ================= */
 :root{
   color-scheme:dark;
-  --bg:#0b0806;
-  --panel:#181209;
-  --panel2:#201811;
-  --border:#3a2d1c;
-  --border-soft:#2a2116;
-  --gold:#e8b93b;
-  --gold-bright:#f7d97e;
-  --text:#efe3c8;
-  --muted:#a3926f;
-  --green:#63c76f;
-  --red:#e2705f;
-  --amber:#e2a84e;
-  --blue:#5fa8e6;
-  --radius:14px;
+  --bg:#0a0d12;
+  --bg2:#0e131a;
+  --surface:#121821;
+  --line:#232d3a;
+  --line2:#334154;
+  --text:#eef3f9;
+  --dim:#9dabbf;
+  --mute:#6f7d90;
+  --accent:#4c9aff;
+  --accent-deep:#1f6feb;
+  --green:#3fb950;
+  --red:#f85149;
+  --amber:#d29922;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{min-height:100%}
 body{
-  font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
-  background:
-    radial-gradient(1100px 520px at 50% -12%, rgba(232,185,59,.10), transparent 62%),
-    radial-gradient(900px 420px at 96% 108%, rgba(140,64,20,.13), transparent 60%),
-    var(--bg);
+  font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  background:var(--bg);
   color:var(--text);
-  font-size:14px;
+  font-size:13px;
   -webkit-font-smoothing:antialiased;
 }
-/* ============ 顶栏（一行） ============ */
-.header{position:sticky;top:0;z-index:30;border-bottom:1px solid var(--border);background:rgba(16,11,7,.94);backdrop-filter:blur(10px)}
-.header-inner{max-width:1120px;margin:0 auto;padding:9px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+/* ================= 顶栏 ================= */
+.header{position:sticky;top:0;z-index:40;background:var(--bg2);border-bottom:1px solid var(--line)}
+.header-inner{display:flex;align-items:center;gap:14px;padding:0 16px;height:46px}
 .brand{display:flex;align-items:center;gap:8px;flex:none}
-.brand .icon{font-size:19px;filter:drop-shadow(0 2px 8px rgba(232,185,59,.45))}
-.brand h1{font-family:Georgia,"Songti SC","SimSun",serif;font-size:17px;letter-spacing:.6px;background:linear-gradient(90deg,#f7d97e,#d9a62e);-webkit-background-clip:text;background-clip:text;color:transparent;display:flex;align-items:center;gap:8px}
-.ver-chip{font-family:Consolas,monospace;font-size:11px;letter-spacing:0;color:var(--gold-bright);border:1px solid var(--border);background:var(--panel2);border-radius:999px;padding:2px 8px;-webkit-text-fill-color:var(--gold-bright)}
-.ver-chip.muted{color:var(--muted);-webkit-text-fill-color:var(--muted)}
-.stats{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-left:auto}
-.stats b{color:var(--gold-bright);font-weight:700;margin-left:3px;font-variant-numeric:tabular-nums}
+.brand .icon{font-size:17px}
+.brand h1{font-size:14px;font-weight:700;letter-spacing:.3px;color:var(--text);display:flex;align-items:center;gap:7px}
+.ver-chip{font-family:Consolas,monospace;font-size:11px;font-weight:600;color:var(--accent);
+  border:1px solid rgba(76,154,255,.35);background:rgba(76,154,255,.1);border-radius:5px;padding:1px 6px}
+.ver-chip.muted{color:var(--mute);border-color:var(--line2);background:transparent}
+.stats{display:flex;align-items:center;gap:16px;margin-left:auto;font-size:12px;color:var(--dim)}
+.stats b{color:var(--text);font-size:13px;font-weight:700;margin-left:3px;font-variant-numeric:tabular-nums}
 .header-right{display:flex;align-items:center;gap:10px;flex:none}
-.clock{font-family:Consolas,monospace;font-size:12px;color:var(--muted)}
-.pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--panel2)}
-.pill .dot{width:8px;height:8px;border-radius:50%;background:#8b8071;flex:none}
-.pill.idle .dot{background:#8b8071}
-.pill.waiting .dot{background:var(--blue)}
-.pill.playing .dot{background:var(--green);animation:pulse 1.4s infinite}
-.pill.stopping .dot{background:var(--amber);animation:pulse 1.4s infinite}
-.pill.finished .dot{background:#7fb98a}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(99,199,111,.55)}70%{box-shadow:0 0 0 8px rgba(99,199,111,0)}100%{box-shadow:0 0 0 0 rgba(99,199,111,0)}}
-/* ============ 页面骨架 ============ */
-.page{max-width:none;margin:0 auto;padding:0 18px 14px}
-.cols{column-count:4;column-gap:22px}
-.cols .group{break-inside:avoid;margin:0 0 9px}
-.bottom{margin-top:2px;border-top:1px solid var(--border-soft);padding-top:5px}
-.bottom .group{margin:0}
-@media (min-width:2100px){.cols{column-count:5;column-gap:26px}}
-@media (max-width:1200px){.cols{column-count:3}}
-@media (max-width:900px){.cols{column-count:2}}
-@media (max-width:640px){.cols{column-count:1}}
+.clock{font-family:Consolas,monospace;font-size:12px;color:var(--mute)}
+.pill{display:flex;align-items:center;gap:7px;padding:5px 12px;border-radius:6px;font-size:12.5px;font-weight:700;
+  border:1px solid var(--line2);background:var(--surface);color:var(--dim)}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--mute);flex:none}
+.pill.idle .dot{background:var(--mute)}
+.pill.waiting{color:#79c0ff;border-color:rgba(76,154,255,.4);background:rgba(76,154,255,.12)}
+.pill.waiting .dot{background:var(--accent)}
+.pill.playing{color:#7ee787;border-color:rgba(63,185,80,.45);background:rgba(63,185,80,.14)}
+.pill.playing .dot{background:var(--green);animation:pulse 1.5s infinite}
+.pill.stopping{color:#e3b341;border-color:rgba(210,153,34,.45);background:rgba(210,153,34,.14)}
+.pill.stopping .dot{background:var(--amber);animation:pulse 1.5s infinite}
+.pill.finished{color:#7ee787;border-color:rgba(63,185,80,.35);background:rgba(63,185,80,.1)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* ================= 常驻操作条 ================= */
+.actionbar{position:sticky;top:46px;z-index:35;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:8px 16px;background:#0c1118;border-bottom:1px solid var(--line)}
+.actionbar .ab-hint{font-size:12px;color:var(--dim);margin-left:2px}
+.actionbar .ab-hint b{color:var(--text)}
+/* ================= 页面骨架 ================= */
+.page{padding:12px 16px 14px}
 #banners:empty{display:none}
-.group{margin-top:0}
-.group-title{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--gold);padding:5px 2px 4px;border-bottom:1px solid var(--border);min-height:24px}
-.group-title .gt-tools{display:flex;align-items:center;gap:8px;font-weight:400;letter-spacing:0}
-/* ============ 行：左标题 / 右控件 ============ */
-.row{display:grid;grid-template-columns:minmax(120px,1fr) auto;gap:10px;align-items:center;padding:3px 2px;border-bottom:1px solid rgba(58,45,28,.5)}
-.row:last-child{border-bottom:0}
-.row-label{font-size:12.5px;line-height:1.3;color:var(--text);min-width:0}
-.row-desc{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.45}
-.row-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;min-width:0}
-.row.block{grid-template-columns:1fr;gap:5px;align-items:start}
+.cols{column-count:4;column-gap:20px}
+.cols .group{break-inside:avoid;margin:0 0 15px}
+.bottom{margin-top:2px;padding-top:10px;border-top:1px solid var(--line)}
+@media (min-width:2100px){.cols{column-count:5;column-gap:24px}}
+@media (max-width:1180px){.cols{column-count:3}}
+@media (max-width:880px){.cols{column-count:2}}
+@media (max-width:620px){.cols{column-count:1}}
+/* ================= 分组 ================= */
+.group{margin:0}
+.group-title{display:flex;align-items:center;gap:8px;padding:0 0 5px 9px;margin-bottom:2px;
+  border-bottom:1px solid var(--line);position:relative;min-height:22px}
+.group-title::before{content:"";position:absolute;left:0;top:2px;width:3px;height:13px;border-radius:2px;background:var(--accent)}
+.group-title > span:first-child{font-size:13px;font-weight:700;letter-spacing:.3px;color:var(--text)}
+.group-title .gt-sub{font-size:11px;font-weight:400;color:#8695a8;letter-spacing:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-title .gt-tools{margin-left:auto;display:flex;align-items:center;gap:6px;flex:none}
+/* ================= 行 ================= */
+.row{display:grid;grid-template-columns:minmax(92px,1fr) auto;gap:10px;align-items:center;
+  padding:4px 6px;border-radius:4px}
+.row:hover{background:rgba(76,154,255,.06)}
+.row-label{font-size:12.5px;color:#dbe4ef;line-height:1.3;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-control{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;min-width:0}
+.row.block{grid-template-columns:1fr;gap:4px;align-items:start}
 .row.block .row-control{justify-content:flex-start}
-.row-note{font-size:11.5px;color:var(--muted);line-height:1.5;padding:4px 2px 2px}
-.status{font-size:12px;color:var(--muted);line-height:1.35}
-@media (max-width:760px){
-  .row{grid-template-columns:1fr;gap:5px;padding:8px 2px}
-  .row-control{justify-content:flex-start}
-  .stats{order:3;width:100%;margin-left:0}
-}
-/* ============ 表单控件 ============ */
-input[type=text],input[type=number],input[type=datetime-local],select{
-  height:27px;background:#0f0b07;border:1px solid var(--border);color:var(--text);
-  border-radius:6px;padding:0 8px;font-size:12.5px;font-family:inherit;
-  transition:border-color .15s,box-shadow .15s;
-}
-input[type=text]{width:100%;max-width:430px}
-.row-control input[type=text]{flex:1 1 220px;width:auto;min-width:0}
-input[type=number]{width:78px;text-align:right;font-variant-numeric:tabular-nums}
-input[type=datetime-local]{width:190px}
-select{min-width:132px;max-width:200px}
-input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,185,59,.13)}
-input:disabled,select:disabled{opacity:.4;cursor:not-allowed}
-/* 开关：纯 CSS，JS 直接读 input.checked，无需额外元素 */
-input[type=checkbox]{
-  appearance:none;-webkit-appearance:none;flex:none;
-  width:34px;height:19px;border-radius:999px;background:#221a11;
-  border:1px solid var(--border);position:relative;cursor:pointer;
-  transition:background .15s,border-color .15s;vertical-align:middle;
-}
-input[type=checkbox]::after{
-  content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;
-  border-radius:50%;background:#8b8071;transition:left .15s,background .15s;
-}
-input[type=checkbox]:checked{background:rgba(232,185,59,.24);border-color:var(--gold)}
-input[type=checkbox]:checked::after{left:17px;background:var(--gold-bright)}
-input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
-/* ============ 按钮 ============ */
-.btn{display:inline-flex;align-items:center;justify-content:center;height:27px;padding:0 11px;
-  border-radius:7px;border:1px solid transparent;background:transparent;color:var(--text);
-  font-size:12.5px;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;
-  font-family:inherit;transition:all .15s}
-.btn:disabled{opacity:.35;cursor:not-allowed;filter:none;transform:none;box-shadow:none}
-.btn-primary{background:linear-gradient(180deg,#f2cd66,#d9a62e);color:#241a05;border-color:#8a6a1c}
-.btn-primary:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 4px 18px rgba(232,185,59,.32);transform:translateY(-1px)}
-.btn-danger{background:linear-gradient(180deg,#c34f3f,#8f2f24);color:#ffe9e4;border-color:#7a2a1f}
-.btn-danger:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 4px 18px rgba(226,112,95,.3)}
-.btn-warn{background:linear-gradient(180deg,#e0a94e,#a9782a);color:#241a05;border-color:#8a6a1c}
-.btn-warn:hover:not(:disabled){filter:brightness(1.08);box-shadow:0 4px 16px rgba(226,168,78,.28)}
-.btn-ghost{background:transparent;color:var(--muted);border-color:var(--border)}
-.btn-ghost:hover:not(:disabled){color:var(--text);border-color:var(--gold)}
-.btn-big{height:30px;padding:0 14px;font-size:13px}
-.btn-small{height:21px;padding:0 8px;font-size:11px;font-weight:500}
-.btn-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
-/* ============ 说明折叠 ============ */
+.row.block .row-label{white-space:normal}
+.row-desc{display:block;font-size:11px;color:var(--mute);margin-top:1px;line-height:1.4;white-space:normal}
+.row-note{font-size:11.5px;color:var(--dim);line-height:1.55;padding:5px 6px 2px}
+.status{font-size:12px;color:var(--dim);line-height:1.35}
 body.hide-desc .desc{display:none}
-/* ============ 可折叠分组 ============ */
+/* ================= 控件 ================= */
+input[type=text],input[type=number],input[type=datetime-local],select{
+  height:27px;background:#080c11;border:1px solid var(--line2);color:var(--text);
+  border-radius:5px;padding:0 8px;font-size:12.5px;font-family:inherit;
+  transition:border-color .12s,box-shadow .12s;
+}
+input[type=text]{width:100%;max-width:420px}
+.row-control input[type=text]{flex:1 1 200px;width:auto;min-width:0}
+input[type=number]{width:76px;text-align:right;font-variant-numeric:tabular-nums}
+input[type=datetime-local]{width:186px}
+select{min-width:126px;max-width:190px}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(76,154,255,.25)}
+input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:none;width:34px;height:19px;border-radius:999px;
+  background:#2a3441;border:1px solid var(--line2);position:relative;cursor:pointer;transition:background .15s,border-color .15s}
+input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+  background:#8fa0b5;transition:left .15s,background .15s}
+input[type=checkbox]:checked{background:rgba(63,185,80,.85);border-color:#2ea043}
+input[type=checkbox]:checked::after{left:17px;background:#fff}
+input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
+/* ================= 按钮 ================= */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:27px;padding:0 11px;
+  border-radius:5px;border:1px solid var(--line2);background:#18202b;color:var(--text);
+  font-size:12.5px;font-weight:600;line-height:1;white-space:nowrap;cursor:pointer;font-family:inherit;
+  transition:background .12s,border-color .12s,filter .12s}
+.btn:hover:not(:disabled){background:#202b38;border-color:#40536b}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn-primary{background:var(--accent-deep);border-color:#2f81f7;color:#fff}
+.btn-primary:hover:not(:disabled){background:#2f81f7;filter:brightness(1.05)}
+.btn-danger{background:#b62324;border-color:#da3633;color:#fff}
+.btn-danger:hover:not(:disabled){background:#da3633}
+.btn-warn{background:#8a6100;border-color:#bb8009;color:#fff}
+.btn-warn:hover:not(:disabled){background:#bb8009}
+.btn-ghost{background:transparent;border-color:var(--line2);color:var(--dim)}
+.btn-ghost:hover:not(:disabled){background:#18202b;color:var(--text)}
+.btn-big{height:32px;padding:0 16px;font-size:13px}
+.btn-small{height:21px;padding:0 8px;font-size:11px;font-weight:500}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+/* ================= 折叠 ================= */
 [data-collapsible].is-collapsed > :not(.card-title){display:none}
-.card-title{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin:0;
-  font-size:12px;font-weight:700;letter-spacing:1.1px;color:var(--gold);
-  padding:9px 2px 7px;border-bottom:1px solid var(--border);min-height:34px}
+.card-title{display:flex;align-items:center;gap:8px;padding:0 0 5px 9px;margin-bottom:2px;
+  border-bottom:1px solid var(--line);position:relative;min-height:22px}
+.card-title::before{content:"";position:absolute;left:0;top:2px;width:3px;height:13px;border-radius:2px;background:var(--accent)}
+.card-title > span:first-child{font-size:13px;font-weight:700;color:var(--text)}
 .card-title .card-toggle{margin-left:auto}
-.card-toggle{height:24px;padding:0 9px;border:1px solid var(--border-soft);border-radius:6px;
-  background:transparent;color:var(--muted);font-size:11.5px;cursor:pointer;flex:none;font-family:inherit}
-.card-toggle:hover{color:var(--gold-bright);border-color:var(--gold)}
-/* ---------- 芯片 / 倒计时 ---------- */
-.chip{display:inline-block;padding:6px 13px;border-radius:999px;font-size:13px;background:rgba(95,168,230,.1);color:#9cc8ea;border:1px solid rgba(95,168,230,.3)}
-.chip.amber{background:rgba(226,168,78,.1);color:#eec07a;border-color:rgba(226,168,78,.32)}
-.countdown-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
-/* ---------- 横幅 ---------- */
-.banner{border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.55}
-.banner-warn{background:rgba(226,168,78,.1);border:1px solid rgba(226,168,78,.35);color:#eec07a}
-.banner-ok{background:rgba(99,199,111,.1);border:1px solid rgba(99,199,111,.3);color:#a5d9a8}
-.banner-err{background:rgba(226,112,95,.1);border:1px solid rgba(226,112,95,.35);color:#f0937f}
-/* ---------- 日志 ---------- */
-.log-box{background:#0a0705;border:1px solid var(--border-soft);border-radius:8px;height:132px;overflow-y:auto;padding:10px 12px;font-family:Consolas,"Courier New",monospace;font-size:12.5px;line-height:1.55;scrollbar-width:thin}
+.card-toggle{height:21px;padding:0 8px;border:1px solid var(--line2);border-radius:5px;background:transparent;
+  color:var(--dim);font-size:11px;cursor:pointer;font-family:inherit}
+.card-toggle:hover{color:var(--text);border-color:var(--accent)}
+/* ================= 自检 ================= */
+.check-list{display:flex;flex-direction:column;gap:0}
+.check-item{display:grid;grid-template-columns:16px 130px minmax(0,1fr);gap:8px;align-items:baseline;
+  padding:4px 4px;border-bottom:1px solid rgba(35,45,58,.7);font-size:12px;line-height:1.4}
+.check-item:last-child{border-bottom:0}
+.check-label{color:var(--text);font-weight:600}
+.check-detail{color:var(--dim);word-break:break-word}
+.check-hint{grid-column:2 / -1;color:var(--amber);font-size:11.5px}
+.check-item.bad .check-hint{color:var(--red)}
+/* ================= 日志 ================= */
+.log-box{background:#05080c;border:1px solid var(--line);border-radius:6px;height:330px;overflow-y:auto;padding:8px 10px;
+  font-family:Consolas,"Courier New",monospace;font-size:12px;line-height:1.5;scrollbar-width:thin}
 .log-line{display:flex;gap:8px;align-items:baseline}
-.log-time{color:#6f6250;flex:none}
-.log-level{width:50px;flex:none;text-align:center;border-radius:4px;font-weight:700;font-size:10.5px;padding:1px 0;align-self:center}
-.log-msg{color:#d9cdb2;word-break:break-all;white-space:pre-wrap}
-.log-error .log-level{background:rgba(226,112,95,.18);color:#f0937f}
-.log-warn .log-level{background:rgba(226,168,78,.16);color:#eec07a}
-.log-sys .log-level{background:rgba(95,168,230,.15);color:#86bfe8}
-.log-debug .log-level{background:rgba(160,160,160,.12);color:#9a9a9a}
-.log-info .log-level{background:rgba(99,199,111,.12);color:#8ed497}
-.autoscroll{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:400;cursor:pointer}
-/* ---------- 自检 / 截图区域清单 ---------- */
-.check-list{display:flex;flex-direction:column;gap:0;margin-top:4px}
-.check-item{display:grid;grid-template-columns:16px 178px 1fr;gap:8px;align-items:baseline;background:none;border:0;border-bottom:1px dashed rgba(61,47,29,.6);border-radius:0;padding:4px 0;font-size:12.5px;line-height:1.45}
-.check-item.ok{border-bottom-color:rgba(99,199,111,.28)}
-.check-item.warn{border-bottom-color:rgba(226,168,78,.28)}
-.check-item.bad{border-bottom-color:rgba(226,112,95,.35)}
-.check-label{color:var(--text);font-weight:600}
-.check-detail{color:var(--muted);word-break:break-word}
-.check-hint{grid-column:2 / -1;color:var(--amber);font-size:12.2px}
-.check-item.bad .check-hint{color:#f0937f}
-@media (max-width:700px){.check-item{grid-template-columns:20px 1fr}.check-label{grid-column:2}.check-detail,.check-hint{grid-column:2 / -1}}
-/* ---------- 卡组识别投降 ---------- */
-.surrender-decks{display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
-.sdeck{background:rgba(32,24,17,.35);border:1px solid var(--border-soft);border-radius:8px;padding:9px 11px}
+.log-time{color:#5c6a7d;flex:none}
+.log-level{width:46px;flex:none;text-align:center;border-radius:3px;font-weight:700;font-size:10px;padding:1px 0}
+.log-msg{color:#cfd9e6;word-break:break-all;white-space:pre-wrap}
+.log-error .log-level{background:rgba(248,81,73,.2);color:#ff7b72}
+.log-warn .log-level{background:rgba(210,153,34,.2);color:#e3b341}
+.log-sys .log-level{background:rgba(76,154,255,.18);color:#79c0ff}
+.log-debug .log-level{background:rgba(139,148,158,.15);color:#8b949e}
+.log-info .log-level{background:rgba(63,185,80,.16);color:#7ee787}
+.autoscroll{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--dim);font-weight:400;cursor:pointer}
+/* ================= 横幅 / 芯片 / 提示 ================= */
+.banner{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;margin-bottom:6px;border-radius:5px;
+  font-size:12.5px;line-height:1.5;border:1px solid transparent}
+.banner-warn{background:rgba(210,153,34,.12);border-color:rgba(210,153,34,.45);color:#e3b341}
+.banner-ok{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.4);color:#7ee787}
+.banner-err{background:rgba(248,81,73,.12);border-color:rgba(248,81,73,.45);color:#ff7b72}
+.chip{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:600;
+  background:rgba(76,154,255,.12);color:#79c0ff;border:1px solid rgba(76,154,255,.35)}
+.chip.amber{background:rgba(210,153,34,.14);color:#e3b341;border-color:rgba(210,153,34,.4)}
+.countdown-row{display:flex;gap:6px;flex-wrap:wrap}
+/* ================= 卡组识别投降 ================= */
+.surrender-decks{display:flex;flex-direction:column;gap:8px}
+.sdeck{background:#0d131b;border:1px solid var(--line);border-radius:6px;padding:8px 10px}
 .sdeck.bad{border-color:var(--red)}
-.sdeck.collapsed{padding:10px 14px}
-.sdeck-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;min-width:0}
+.sdeck.collapsed{padding:6px 10px}
+.sdeck-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;min-width:0}
 .sdeck.collapsed .sdeck-head{margin-bottom:0}
-.sdeck-toggle{width:24px;height:24px;flex:none;padding:0;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:7px;cursor:pointer;font-size:12px;line-height:1}
-.sdeck-toggle:hover{color:var(--gold-bright);border-color:var(--gold-bright)}
-.sdeck-title{font-size:13.5px;font-weight:700;color:var(--gold-bright);flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sdeck-summary{display:none;flex:1;min-width:0;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sdeck-toggle{width:20px;height:20px;flex:none;padding:0;background:transparent;border:1px solid var(--line2);
+  color:var(--dim);border-radius:4px;cursor:pointer;font-size:11px;line-height:1}
+.sdeck-toggle:hover{color:var(--text);border-color:var(--accent)}
+.sdeck-title{font-size:12.5px;font-weight:700;color:var(--text);flex:none;max-width:40%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sdeck-summary{display:none;flex:1;min-width:0;font-size:11.5px;color:var(--mute);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sdeck.collapsed .sdeck-summary{display:block}
-.sdeck-hit{flex:none;font-size:12px;font-weight:700;color:var(--red)}
-.sdeck-body{min-width:0}
-.sdeck.collapsed .sdeck-body{display:none}
-.sdeck-row{display:flex;gap:10px;flex-wrap:wrap}
-.sdeck-row .field{margin-bottom:8px}
-.sdeck-row .field.grow{flex:1;min-width:200px}
-.sdeck-empty{color:var(--muted);font-size:12.5px;padding:6px 2px}
-/* 逻辑组：且 / 或 / 非（可任意层嵌套） */
-.sgroup{border:1px solid var(--border-soft);border-radius:10px;padding:8px;background:rgba(255,255,255,.015)}
-.sgroup[data-depth="0"]{border:none;background:transparent;padding:0}
-.sgroup-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
-.sgroup-op{padding:6px 8px;font-size:12.5px}
-.sgroup-tip{font-size:11.5px;color:var(--amber)}
+.sdeck-hit{flex:none;font-size:11.5px;font-weight:700;color:var(--red)}
+.sgroup{border-left:2px solid var(--line2);padding-left:8px;margin:4px 0}
+.sgroup-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px}
+.sgroup-op{height:24px;font-size:12px;padding:0 6px;min-width:auto;max-width:none}
+.sgroup-body{display:flex;flex-direction:column;gap:4px}
+.sgroup-tip{font-size:11px;color:var(--amber)}
 .sgroup-spacer{flex:1}
-/* 注意：不能给 .sgroup-body 加 overflow:hidden，否则卡名候选浮层会被裁掉 */
-.sgroup-body{display:flex;flex-direction:column;gap:8px;padding-left:12px;margin-left:4px;border-left:2px solid rgba(232,185,59,.22)}
-.scond{display:grid;grid-template-columns:186px minmax(160px,1fr) 168px 30px;gap:8px;align-items:center;background:rgba(255,255,255,.02);border:1px solid var(--border-soft);border-radius:10px;padding:8px}
-@media (max-width:860px){.scond{grid-template-columns:1fr;gap:6px}}
-.scond.unsupported{grid-template-columns:52px minmax(0,1fr) auto 30px}
-.scond-badge{font-size:11px;font-weight:700;color:var(--amber);border:1px solid rgba(232,185,59,.35);border-radius:6px;padding:2px 6px;text-align:center}
-.scond-raw{font-family:Consolas,monospace;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.scond-note{font-size:11.5px;color:var(--muted);white-space:nowrap}
-.scond-multi{font-size:11px;color:var(--amber);white-space:nowrap;flex:none}
-.scond select,.scond input{padding:7px 9px;font-size:13px}
-.scond-type{width:100%}
-.scard-wrap{position:relative;display:flex;align-items:center;gap:6px;min-width:0}
-.scard-wrap input{flex:1;min-width:0}
-.scond-id{font-family:Consolas,monospace;font-size:11.5px;color:var(--muted);white-space:nowrap;flex:none}
-.scond-id.hit{color:var(--green)}
-.scond-id.miss{color:var(--amber)}
-.scond-turn{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
-.scond-turn input{width:54px;padding:6px 7px}
-.scond-del{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;width:28px;height:28px;line-height:1;cursor:pointer;font-size:15px}
+.scond{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 0}
+.scond-type{height:24px;font-size:12px;min-width:118px;max-width:150px}
+.scard-wrap{position:relative;display:flex;align-items:center;gap:4px;flex:1 1 180px;min-width:0}
+.scard-wrap input{height:24px;font-size:12px;width:100%;max-width:none}
+.scond-id{font-family:Consolas,monospace;font-size:10.5px;color:var(--mute);white-space:nowrap}
+.scond-multi{font-size:10.5px;color:var(--accent);white-space:nowrap}
+.scond-turn{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--mute);white-space:nowrap}
+.scond-turn input{height:24px;width:46px;font-size:11.5px;padding:0 4px}
+.scond-del{width:20px;height:20px;flex:none;border:1px solid var(--line2);background:transparent;color:var(--mute);
+  border-radius:4px;cursor:pointer;font-size:12px;line-height:1;padding:0}
 .scond-del:hover{color:var(--red);border-color:var(--red)}
-.scard-menu{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#241b10;border:1px solid var(--border);border-radius:10px;max-height:232px;overflow-y:auto;z-index:40;box-shadow:0 14px 34px rgba(0,0,0,.6);display:none}
-.scard-menu.open{display:block}
-.scard-item{padding:7px 10px;font-size:12.8px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:baseline;border-bottom:1px solid var(--border-soft)}
-.scard-item:last-child{border-bottom:none}
-.scard-item:hover,.scard-item.active{background:rgba(232,185,59,.16)}
-.scard-item .cname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.scard-item .cid{font-family:Consolas,monospace;color:var(--muted);font-size:11px;flex:none}
-.scard-empty,.scard-loading{padding:8px 10px;font-size:12.5px;color:var(--muted)}
-.surrender-json{margin:10px 0}
-.surrender-json textarea{width:100%;min-height:200px;background:#0f0b07;border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:Consolas,monospace;font-size:12.5px;padding:10px;line-height:1.55;resize:vertical}
-.surrender-status{font-size:12.5px;line-height:1.7;color:var(--text);margin-top:10px}
-.surrender-status .sd{display:block;color:var(--muted)}
-.surrender-status .ok{color:var(--green)}
-.surrender-status .no{color:var(--muted)}
-.surrender-status .fire{color:var(--red);font-weight:700}
-/* ---------- Toast ---------- */
-#toasts{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:99}
-.toast{background:#241b10;border:1px solid var(--border);border-left:4px solid var(--blue);padding:10px 14px;border-radius:10px;font-size:13px;max-width:340px;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:slidein .25s;transition:all .4s}
+.scond.unsupported{color:var(--mute)}
+.scond-badge{font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(210,153,34,.16);color:#e3b341;border:1px solid rgba(210,153,34,.4)}
+.scond-raw{font-family:Consolas,monospace;font-size:10.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.scond-note{font-size:10.5px;color:var(--mute)}
+.sdeck-empty{font-size:11.5px;color:var(--mute);padding:4px 0}
+.scard-menu{position:absolute;top:26px;left:0;right:0;z-index:60;background:#0d131b;border:1px solid var(--line2);
+  border-radius:5px;max-height:180px;overflow-y:auto;display:none}
+.scard-menu.show{display:block}
+.scard-item{padding:4px 8px;font-size:12px;cursor:pointer;color:var(--text)}
+.scard-item:hover,.scard-item.active{background:rgba(76,154,255,.15)}
+.surrender-json{margin-top:6px}
+.surrender-json textarea{width:100%;height:150px;background:#05080c;border:1px solid var(--line2);color:var(--text);
+  border-radius:5px;padding:8px;font-family:Consolas,monospace;font-size:11.5px;resize:vertical}
+.surrender-status{font-size:11.5px;color:var(--dim);margin-top:6px}
+.sd{display:inline-block;margin-right:10px}
+.footer{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);color:var(--mute);font-size:11px;text-align:center}
+#toasts{position:fixed;right:16px;bottom:16px;z-index:100;display:flex;flex-direction:column;gap:6px}
+.toast{background:#161d27;border:1px solid var(--line2);border-left:3px solid var(--accent);
+  padding:8px 12px;border-radius:5px;font-size:12.5px;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.toast.err{border-left-color:var(--red)}
 .toast.ok{border-left-color:var(--green)}
-.toast.error{border-left-color:var(--red)}
-.toast.warn{border-left-color:var(--amber)}
-.toast.out{opacity:0;transform:translateX(14px)}
-@keyframes slidein{from{opacity:0;transform:translateX(16px)}to{opacity:1}}
-.footer{text-align:center;color:#5c5344;font-size:12px;padding:18px 0 34px}
-a{color:var(--gold-bright);text-decoration:none;border-bottom:1px dashed rgba(247,217,126,.45)}
-a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
-
-/* ============ 行式布局下的组件适配（覆盖保留段） ============ */
-.check-list{display:flex;flex-direction:column;gap:0;margin-top:2px}
-.check-item{display:grid;grid-template-columns:18px 168px minmax(0,1fr);gap:10px;align-items:baseline;
-  background:none;border:0;border-bottom:1px dashed rgba(58,45,28,.55);border-radius:0;
-  padding:5px 2px;font-size:12.5px;line-height:1.45}
-.check-item.ok{border-left:0;border-bottom-color:rgba(99,199,111,.25)}
-.check-item.warn{border-left:0;border-bottom-color:rgba(226,168,78,.25)}
-.check-item.bad{border-left:0;border-bottom-color:rgba(226,112,95,.32)}
-.check-label{color:var(--text);font-weight:600}
-.check-detail{color:var(--muted);word-break:break-word}
-.check-hint{grid-column:2 / -1;color:var(--amber);font-size:12px}
-.log-box{height:150px;border-radius:8px}
-.chip{padding:3px 10px;font-size:12px;border-radius:999px}
-.countdown-row{display:flex;gap:8px;flex-wrap:wrap;margin:0}
-.surrender-decks{margin-top:4px}
-.footer{max-width:1120px;margin:22px auto 0;padding:14px 22px 0;border-top:1px solid var(--border-soft);
-  color:var(--muted);font-size:11.5px;text-align:center}
 </style>
 </head>
 
@@ -273,12 +243,11 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
       <h1>HSLegendArriver <span id="appVersion" class="ver-chip muted">v—</span></h1>
     </div>
     <div class="stats">
-      <span>状态 <b id="stState">待机</b></span>
       <span>对局 <b id="stGames">0</b></span>
       <span>胜 <b id="stWins">0</b></span>
       <span>认输 <b id="stConcede">0</b></span>
       <span>胜率 <b id="stRate">--</b></span>
-      <span id="gameElapsedRow" style="display:none">⏱ <b id="stElapsed">0:00</b><span id="stopNote"></span></span>
+      <span id="gameElapsedRow" style="display:none">本局 <b id="stElapsed">0:00</b><span id="stopNote"></span></span>
     </div>
     <div class="header-right">
       <div id="statusPill" class="pill idle"><span class="dot"></span><span id="pillText">空闲</span></div>
@@ -288,605 +257,323 @@ a:hover{color:#fff3c9;border-bottom-color:#fff3c9}
   </div>
 </header>
 
+<div class="actionbar">
+  <button id="btnStart" class="btn btn-primary btn-big" type="button">⚔️ 开始运行</button>
+  <button id="btnOverlay" class="btn" type="button">🪟 日志浮窗（关）</button>
+  <button id="btnAfterGame" class="btn btn-warn" type="button" disabled>本局结束后停止</button>
+  <button id="btnStopNow" class="btn btn-danger" type="button" disabled>立即停止</button>
+  <span class="ab-hint">当前状态 <b id="stState">待机</b> · Ctrl+Q 急停</span>
+</div>
+
 <main class="page">
   <div id="banners"></div>
 
+  <div class="row-note desc" style="padding:4px 2px 8px">🪄 点「开始运行」只会打开日志浮窗、把炉石切到前台，<b>不会自动开打</b>；就绪后按钮变为「开始对战」，再点一次（二次确认后）才真正开始。⌨️ 快捷键 Ctrl+Q 可随时立即停止自动化。<br>🖥️ 炉石请使用 <b>全屏模式</b>（设置 → 选项 → 显示 → 全屏），<b>不要用「最大化窗口」</b>：最大化时窗口坐标与 1920×1080 全屏不一致，硬编码的点击坐标会整体偏移——下随从因有吸附还能成功，法术指定目标则会一直失败重试。<br>♻ 浮窗上的「重启炉石」会先弹确认，再执行「停自动化 → 结束 Hearthstone.exe → 清空日志目录（保留 Log.config）→ 重新启动炉石」，并<b>等到认出主界面才算成功</b>。<br>🚪「退出浮窗」只关窗口、脚本继续跑；<b>关掉浮窗会回到未就绪</b>状态（大按钮变回「开始运行（准备）」），再点「开始运行」把浮窗开出来即可。</div>
+
   <div class="cols">
-      <section class="group">
+    <section class="group">
+      <h2 class="group-title"><span>账号</span><span class="gt-sub">战网昵称与日志目录</span></h2>
+      <div class="row">
+        <div class="row-label">用户 ID（含 #编号）</div>
+        <div class="row-control"><input id="inpName" type="text" placeholder="昵称#12345"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">炉石日志目录</div>
+        <div class="row-control">
+          <input id="inpLog" type="text" placeholder="D:\Hearthstone\Logs">
+          <button id="btnCheckLog" class="btn btn-ghost" type="button">检测</button>
+        </div>
+      </div>
+      <div class="row block">
+        <div class="row-label">账号校验</div>
+        <div class="row-control" style="justify-content:flex-start"><span class="status" id="nameMatch">等待读到对局日志中的玩家名…</span></div>
+      </div>
+      <div class="row block">
+        <div class="row-control" style="justify-content:flex-start"><span class="status" id="logHint"></span></div>
+      </div>
+      <div class="row-note desc">必须与战网账号的<b>完整昵称</b>一致（含 <b>#编号</b>）：脚本靠昵称区分敌我，不匹配会把整局当成对手回合而一直不出牌。输入框失焦即自动保存；自动化运行期间不可修改。</div>
+    </section>
 
-        <h2 class="group-title">对战</h2>
+    <section class="group">
+      <h2 class="group-title"><span>定时任务</span><span class="gt-sub">到点自动开始 / 结束</span></h2>
+      <div class="row">
+        <div class="row-label">开始时间</div>
+        <div class="row-control"><input id="inpStart" type="datetime-local"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">结束时间</div>
+        <div class="row-control"><input id="inpEnd" type="datetime-local"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">计划</div>
+        <div class="row-control">
+          <span class="countdown-row" id="countdownRow" style="display:none">
+            <span class="chip" id="chipStart">距开始 --</span>
+            <span class="chip amber" id="chipEnd">距结束 --</span>
+          </span>
+          <button id="btnSchedule" class="btn btn-primary" type="button">保存</button>
+          <button id="btnCancelSched" class="btn btn-ghost" type="button" disabled>取消</button>
+        </div>
+      </div>
+      <div class="row-note desc">开始时间不能早于当前；结束时间留空则一直运行，到点会先打完本局再停。</div>
+    </section>
 
-        <div class="row">
+    <section class="group">
+      <h2 class="group-title"><span>存活检测</span><span class="gt-sub">进程或日志不动就告警并停止</span>
+        <span class="gt-tools"><button id="btnSaveLiveness" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+      <div class="row">
+        <div class="row-label">启用</div>
+        <div class="row-control"><input id="chkLiveness" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">停滞告警（秒）</div>
+        <div class="row-control"><input id="inpLvWarn" type="number" min="1" max="3600" step="10"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">自动停止（秒）</div>
+        <div class="row-control"><input id="inpLvStop" type="number" min="1" max="7200" step="10"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">状态</div>
+        <div class="row-control"><span class="status" id="livenessStatus">等待检测…</span></div>
+      </div>
+      <div class="row-note desc">每轮确认 Hearthstone.exe 是否还在、对局中 Power.log 是否还在更新；判定退出就告警并停止自动化，不会对着失效画面空转。默认开启。</div>
+    </section>
 
-          <div class="row-label">操作</div>
+    <section class="group">
+      <h2 class="group-title"><span>中断重启</span><span class="gt-sub">卡住就重启炉石、重开一局</span>
+        <span class="gt-tools"><button id="btnSaveWatchdog" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+      <div class="row">
+        <div class="row-label">启用</div>
+        <div class="row-control"><input id="chkWatchdog" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">判定停滞（秒）</div>
+        <div class="row-control"><input id="inpWdStale" type="number" min="30" max="3600" step="30"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">最多重启次数</div>
+        <div class="row-control"><input id="inpWdMax" type="number" min="1" max="20" step="1"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">状态</div>
+        <div class="row-control"><span class="status" id="watchdogStatus">等待检测…</span></div>
+      </div>
+      <div class="row-note desc">打开后日志停滞交给它「重启炉石 → 等主界面 → 重新进入对战」，存活检测的自动停止不再触发；只在自动化运行中判定，主界面发呆不会误重启。</div>
+    </section>
 
-          <div class="row-control">
+    <section class="group">
+      <h2 class="group-title"><span>自动投降</span><span class="gt-sub">AI 胜率太低就认输</span>
+        <span class="gt-tools"><button id="btnSaveConcede" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+      <div class="row">
+        <div class="row-label">启用</div>
+        <div class="row-control"><input id="chkConcede" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">胜率阈值（%）</div>
+        <div class="row-control"><input id="inpConcedeThreshold" type="number" min="0" max="100" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">连续回合数</div>
+        <div class="row-control"><input id="inpConcedeRounds" type="number" min="1" max="50" step="1"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">状态</div>
+        <div class="row-control"><span class="status" id="concedeDetect">等待自动化运行…</span></div>
+      </div>
+      <div class="row-note desc">读左上角盒子「AI胜率」，连续 N 回合低于阈值时执行：右下角齿轮 → 中间红色「认输」。默认关闭。</div>
+    </section>
 
-            <button id="btnStart" class="btn btn-primary btn-big" type="button">⚔️ 开始运行</button>
+    <section class="group" id="cardRank">
+      <h2 class="group-title"><span>段位目标</span><span class="gt-sub">到名次就停 / 控分</span>
+        <span class="gt-tools"><button id="btnSaveRankStop" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+      <div class="row">
+        <div class="row-label">启用</div>
+        <div class="row-control"><input id="chkRankStop" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">判定方式</div>
+        <div class="row-control">
+          <select id="inpRankMode">
+            <option value="legend">上传说就停</option>
+            <option value="legend_number">指定传说名次</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-label">传说名次</div>
+        <div class="row-control"><input id="inpRankNumber" type="number" min="1" max="100000" step="1"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">到该名次后</div>
+        <div class="row-control">
+          <select id="inpRankAction">
+            <option value="stop">达到后停止</option>
+            <option value="keep">控分（不超过）</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-label">状态</div>
+        <div class="row-control"><span class="status" id="rankStopStatus">等待自动化运行…</span></div>
+      </div>
+      <div class="row-note desc">只在「选择套牌」界面读一次右上角名次（数值越小名次越高）。<b>达到后停止</b>：名次 ≤ 目标 → 本局结束后停；<b>控分</b>：名次 &lt; 目标 → 开局即投降，压到不超目标再正常打（单次最多 40 局）。默认关闭。</div>
+    </section>
 
-            <button id="btnOverlay" class="btn" type="button">🪟 日志浮窗（关）</button>
-
-            <button id="btnAfterGame" class="btn btn-warn" type="button" disabled>本局结束后停止</button>
-
-            <button id="btnStopNow" class="btn btn-danger" type="button" disabled>立即停止</button>
-
+    <section class="group" id="cardSurrender" data-collapsible="1">
+      <h2 class="group-title card-title">
+        <span>卡组识别投降</span>
+        <span class="gt-sub">认出对面卡组就投</span>
+        <span class="gt-tools" style="gap:6px;font-size:11.5px;color:var(--dim)">
+          <span>启用</span><input id="chkSurrender" type="checkbox">
+        </span>
+      </h2>
+      <div class="row block">
+        <div class="row-control" style="width:100%;flex-direction:column;align-items:stretch;gap:6px">
+          <div id="surrenderDecks" class="surrender-decks"></div>
+          <div class="btn-row">
+            <button id="btnAddSurrenderDeck" class="btn btn-ghost btn-small" type="button">+ 添加卡组</button>
+            <button id="btnToggleSurrenderJson" class="btn btn-ghost btn-small" type="button">⚙ 高级 JSON</button>
+            <button id="btnSaveSurrender" class="btn btn-primary btn-small" type="button">保存</button>
           </div>
-
-        </div>
-
-        <div class="row-note desc">🪄 点「开始运行」只会打开日志浮窗、把炉石切到前台，<b>不会自动开打</b>；就绪后按钮变为「开始对战」，再点一次（二次确认后）才真正开始。⌨️ 快捷键 Ctrl+Q 可随时立即停止自动化。<br>🖥️ 炉石请使用 <b>全屏模式</b>（设置 → 选项 → 显示 → 全屏），<b>不要用「最大化窗口」</b>：最大化时窗口坐标与 1920×1080 全屏不一致，硬编码的点击坐标会整体偏移——下随从因有吸附还能成功，法术指定目标则会一直失败重试。<br>♻ 浮窗上的「重启炉石」会先弹确认，再执行「停自动化 → 结束 Hearthstone.exe → 清空日志目录（保留 Log.config）→ 重新启动炉石」，并<b>等到认出主界面才算成功</b>。<br>🚪「退出浮窗」只关窗口、脚本继续跑；<b>关掉浮窗会回到未就绪</b>状态（大按钮变回「开始运行（准备）」），再点「开始运行」把浮窗开出来即可。</div>
-
-      </section>
-
-      <section class="group">
-
-        <h2 class="group-title">账号</h2>
-
-        <div class="row">
-
-          <div class="row-label">用户 ID（战网完整昵称）<span class="row-desc desc">必须含 <b>#编号</b>，否则分不清敌我，会一直不出牌</span></div>
-
-          <div class="row-control"><input id="inpName" type="text" placeholder="昵称#12345"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">炉石日志目录（Logs）<span class="row-desc desc">通常是炉石安装目录下的 Logs 文件夹</span></div>
-
-          <div class="row-control">
-
-            <input id="inpLog" type="text" placeholder="D:\Hearthstone\Logs">
-
-            <button id="btnCheckLog" class="btn btn-ghost" type="button">检测</button>
-
-          </div>
-
-        </div>
-
-        <div class="row block">
-
-          <div class="row-label">账号校验</div>
-
-          <div class="row-control" style="justify-content:flex-start"><span class="status" id="nameMatch">等待读到对局日志中的玩家名…</span></div>
-
-        </div>
-
-        <div class="row block">
-
-          <div class="row-control" style="justify-content:flex-start"><span class="status" id="logHint"></span></div>
-
-        </div>
-
-        <div class="row-note desc">💡 输入框失焦即自动保存；自动化运行期间不可修改。</div>
-
-      </section>
-
-      <section class="group">
-
-        <h2 class="group-title">定时任务</h2>
-
-        <div class="row">
-
-          <div class="row-label">开始时间<span class="row-desc desc">不能早于当前时间</span></div>
-
-          <div class="row-control"><input id="inpStart" type="datetime-local"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">结束时间<span class="row-desc desc">留空则一直运行；到点先打完本局再停</span></div>
-
-          <div class="row-control"><input id="inpEnd" type="datetime-local"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">计划</div>
-
-          <div class="row-control">
-
-            <span class="countdown-row" id="countdownRow" style="display:none">
-
-              <span class="chip" id="chipStart">距开始 --</span>
-
-              <span class="chip amber" id="chipEnd">距结束 --</span>
-
-            </span>
-
-            <button id="btnSchedule" class="btn btn-primary" type="button">💾 保存</button>
-
-            <button id="btnCancelSched" class="btn btn-ghost" type="button" disabled>取消计划</button>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      <section class="group">
-
-        <h2 class="group-title"><span>存活检测</span><span class="gt-tools"><button id="btnSaveLiveness" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
-
-        <div class="row">
-
-          <div class="row-label">启用<span class="row-desc desc">进程消失或日志长时间不动时告警并停止</span></div>
-
-          <div class="row-control"><input id="chkLiveness" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">停滞告警（秒）</div>
-
-          <div class="row-control"><input id="inpLvWarn" type="number" min="1" max="3600" step="10"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">停滞自动停止（秒）</div>
-
-          <div class="row-control"><input id="inpLvStop" type="number" min="1" max="7200" step="10"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">状态</div>
-
-          <div class="row-control"><span class="status" id="livenessStatus">等待检测…</span></div>
-
-        </div>
-
-        <div class="row-note desc">挂机最怕「炉石已经没了，脚本还在对着失效画面做 OCR」。开启后每轮都会确认 Hearthstone.exe 是否还在、对局中 Power.log 是否还在更新，判定退出就告警并停止自动化。默认开启。</div>
-
-      </section>
-
-      <section class="group">
-
-        <h2 class="group-title"><span>中断重启</span><span class="gt-tools"><button id="btnSaveWatchdog" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
-
-        <div class="row">
-
-          <div class="row-label">启用<span class="row-desc desc">日志停滞就重启炉石并重开一局</span></div>
-
-          <div class="row-control"><input id="chkWatchdog" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">停滞多久算卡住（秒）</div>
-
-          <div class="row-control"><input id="inpWdStale" type="number" min="30" max="3600" step="30"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">最多重启次数<span class="row-desc desc">10 分钟内超过就停止并告警</span></div>
-
-          <div class="row-control"><input id="inpWdMax" type="number" min="1" max="20" step="1"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">状态</div>
-
-          <div class="row-control"><span class="status" id="watchdogStatus">等待检测…</span></div>
-
-        </div>
-
-        <div class="row-note desc">打开后日志停滞交给它「重启炉石 → 等主界面 → 重新进入对战」，存活检测的「自动停止」不再触发；只在自动化运行中判定，主界面发呆不会误重启。</div>
-
-      </section>
-
-      <section class="group">
-
-        <h2 class="group-title"><span>自动投降</span><span class="gt-tools"><button id="btnSaveConcede" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
-
-        <div class="row">
-
-          <div class="row-label">启用<span class="row-desc desc">盒子 AI 胜率连续低于阈值就认输</span></div>
-
-          <div class="row-control"><input id="chkConcede" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">AI 胜率阈值（%）</div>
-
-          <div class="row-control"><input id="inpConcedeThreshold" type="number" min="0" max="100" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">连续回合数</div>
-
-          <div class="row-control"><input id="inpConcedeRounds" type="number" min="1" max="50" step="1"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">状态</div>
-
-          <div class="row-control"><span class="status" id="concedeDetect">等待自动化运行…</span></div>
-
-        </div>
-
-        <div class="row-note desc">检测左上角盒子「AI胜率」，连续 N 回合低于阈值时执行：右下角齿轮 → 中间红色「认输」。默认关闭。</div>
-
-      </section>
-
-      <section class="group" id="cardRank">
-
-        <h2 class="group-title"><span>段位目标</span><span class="gt-tools"><button id="btnSaveRankStop" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
-
-        <div class="row">
-
-          <div class="row-label">启用</div>
-
-          <div class="row-control"><input id="chkRankStop" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">判定方式</div>
-
-          <div class="row-control">
-
-            <select id="inpRankMode">
-
-              <option value="legend">上传说就停</option>
-
-              <option value="legend_number">指定传说名次</option>
-
-            </select>
-
-          </div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">传说名次<span class="row-desc desc">数值越小名次越高</span></div>
-
-          <div class="row-control"><input id="inpRankNumber" type="number" min="1" max="100000" step="1"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">到该名次后</div>
-
-          <div class="row-control">
-
-            <select id="inpRankAction">
-
-              <option value="stop">达到后停止（上分停止）</option>
-
-              <option value="keep">控分（不超过该名次）</option>
-
-            </select>
-
-          </div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">状态</div>
-
-          <div class="row-control"><span class="status" id="rankStopStatus">等待自动化运行…</span></div>
-
-        </div>
-
-        <div class="row-note desc">只在「选择套牌」界面读一次右上角名次。<b>达到后停止</b>：名次 ≤ 目标 → 本局结束后停；<b>控分</b>：名次 &lt; 目标 → 开局即投降，压到不超目标再正常打（单次最多 40 局）。默认关闭。</div>
-
-      </section>
-
-      <section class="group" id="cardSurrender" data-collapsible="1">
-
-        <h2 class="card-title">
-
-          <span>卡组识别投降</span>
-
-          <label class="row-control" style="font-size:12px;gap:6px;color:var(--text)">
-
-            <span style="font-weight:400">启用</span>
-
-            <input id="chkSurrender" type="checkbox">
-
-          </label>
-
-        </h2>
-
-        <div class="row block">
-
-          <div class="row-control" style="width:100%;flex-direction:column;align-items:stretch;gap:8px">
-
-            <div id="surrenderDecks" class="surrender-decks"></div>
-
-            <div class="btn-row">
-
-              <button id="btnAddSurrenderDeck" class="btn btn-ghost btn-small" type="button">+ 添加卡组</button>
-
-              <button id="btnToggleSurrenderJson" class="btn btn-ghost btn-small" type="button">⚙ 高级 JSON</button>
-
-              <button id="btnSaveSurrender" class="btn btn-warn" type="button">💾 保存卡组识别</button>
-
+          <div id="surrenderJsonWrap" class="surrender-json" style="display:none">
+            <textarea id="surrenderJson" spellcheck="false"></textarea>
+            <div class="btn-row" style="margin-top:4px">
+              <button id="btnApplySurrenderJson" class="btn btn-ghost btn-small" type="button">把 JSON 载入到表单</button>
             </div>
-
-            <div id="surrenderJsonWrap" class="surrender-json" style="display:none">
-
-              <textarea id="surrenderJson" spellcheck="false"></textarea>
-
-              <div class="btn-row">
-
-                <button id="btnApplySurrenderJson" class="btn btn-ghost btn-small" type="button">把 JSON 载入到表单</button>
-
-              </div>
-
-              <div class="row-note">表单支持多层「且 / 或 / 非」；表单表达不了的字段（<code>turn</code> / <code>card_type</code> / <code>at_least</code>）会标成「高级」并原样保留。</div>
-
-            </div>
-
-            <div class="surrender-status" id="surrenderStatus">状态：等待自动化运行…</div>
-
+            <div class="row-note">表单支持多层「且 / 或 / 非」；表单表达不了的字段（<code>turn</code> / <code>card_type</code> / <code>at_least</code>）会标成「高级」并原样保留。</div>
           </div>
-
+          <div class="surrender-status" id="surrenderStatus">状态：等待自动化运行…</div>
         </div>
-
-        <div class="row-note desc">按「对方有哪些卡」识别卡组，命中就立刻投降：卡名输入中文会弹候选；每组可选且/或/非并多层嵌套；所有条件只判对方。点右上「展开」编辑。</div>
-
-      </section>
-
-      <section class="group" id="cardHuman">
-
-        <h2 class="group-title"><span>活人感</span><span class="gt-tools"><button id="btnSaveHumanLike" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
-
-        <div class="row">
-
-          <div class="row-label">启用</div>
-
-          <div class="row-control"><input id="chkHumanLike" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">看卡牌<span class="row-desc desc">延时期间在手牌区随手停</span></div>
-
-          <div class="row-control"><input id="chkHlHand" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">随机延时下限（秒）</div>
-
-          <div class="row-control"><input id="inpHlMin" type="number" min="0" max="60" step="0.1"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">随机延时上限（秒）</div>
-
-          <div class="row-control"><input id="inpHlMax" type="number" min="0" max="60" step="0.1"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">每处悬停下限（秒）</div>
-
-          <div class="row-control"><input id="inpHlHoverMin" type="number" min="0.05" max="30" step="0.05"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">每处悬停上限（秒）</div>
-
-          <div class="row-control"><input id="inpHlHoverMax" type="number" min="0.05" max="30" step="0.05"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">看随从<span class="row-desc desc">对手新随从出现时看一眼</span></div>
-
-          <div class="row-control"><input id="chkHlMinion" type="checkbox"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">随从悬停下限（秒）</div>
-
-          <div class="row-control"><input id="inpHlMinionMin" type="number" min="0.05" max="30" step="0.05"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">随从悬停上限（秒）</div>
-
-          <div class="row-control"><input id="inpHlMinionMax" type="number" min="0.05" max="30" step="0.05"></div>
-
-        </div>
-
-        <div class="row-note desc">全程只移动鼠标、绝不点击：操作后先随机等一段再出牌，等待期间在手牌区随手停；对手新随从出现时悬停一下。关掉「看卡牌」连随机延时一起取消，回到固定延时。默认关闭，下一局生效。</div>
-
-      </section>
-
-      <section class="group" id="cardDelay">
-
-        <h2 class="group-title"><span>延时</span><span class="gt-tools"><button id="btnSaveDelays" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
-
-        <div class="row">
-
-          <div class="row-label">换牌前等待（秒）</div>
-
-          <div class="row-control"><input id="inpReadyDelay" type="number" min="0" max="120" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">识别后缓冲（秒）<span class="row-desc desc">换牌识别成功到点击之间</span></div>
-
-          <div class="row-control"><input id="inpPostOcrDelay" type="number" min="0" max="30" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">换牌重试间隔（秒）</div>
-
-          <div class="row-control"><input id="inpRetryDelay" type="number" min="0" max="60" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">每张开局卡延时（秒）</div>
-
-          <div class="row-control"><input id="inpFirstTurnPerCard" type="number" min="0" max="20" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">每回合前延时（秒）</div>
-
-          <div class="row-control"><input id="inpPreDelay" type="number" min="0" max="60" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">操作后延时（秒）</div>
-
-          <div class="row-control"><input id="inpPostDelay" type="number" min="0" max="10" step="0.25"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">抽牌额外延时（秒/张）<span class="row-desc desc">回合内抽到牌时每张额外等待；回合开始那 1 张常规抽牌不算</span></div>
-
-          <div class="row-control"><input id="inpDrawDelay" type="number" min="0" max="20" step="0.5"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">抉择/发现选目标延时（秒）</div>
-
-          <div class="row-control"><input id="inpChoiceTargetDelay" type="number" min="0" max="5" step="0.1"></div>
-
-        </div>
-
-        <div class="row">
-
-          <div class="row-label">OCR 缩放<span class="row-desc desc">精度/速度平衡点</span></div>
-
-          <div class="row-control"><input id="inpOcrScale" type="number" min="0.5" max="4" step="0.1"></div>
-
-        </div>
-
-        <div class="row block">
-
-          <div class="row-label">当前时序</div>
-
-          <div class="row-control" style="justify-content:flex-start"><span class="status" id="delayHint">由服务端配置返回</span></div>
-
-        </div>
-
-      </section>
-
-      <section class="group" id="cardRegions">
-
-        <h2 class="group-title">校准</h2>
-
-        <div class="row">
-
-          <div class="row-label">屏幕校准窗口<span class="row-desc desc">13 个目标都能拖：推荐面板、换牌确认、AI 胜率、结算开始、段位、模式按钮…</span></div>
-
-          <div class="row-control"><button id="btnCalibrate" class="btn btn-ghost" type="button">📐 打开校准窗口</button></div>
-
-        </div>
-
-        <div class="row-note desc">自动化没跑时打开：屏幕上只画当前目标那一个框 + 屏幕正中央的目标条 + 右侧推荐区域实时 OCR 预览，并提示<b>「请对齐相应UI」</b>。<b>Tab</b> 切换目标、拖框/拖手柄改位置大小、<b>S</b> 保存、<b>Esc</b> 退出。框外画面<b>鼠标穿透</b>，可边看游戏边调。拖动/缩放炉石窗口时框会实时跟着走，校准一次即可。<br>🎯 13 个目标：<b>盒子推荐面板</b>、换牌推荐面板（最多 4 张留牌）、<b>换牌确认按钮</b>、<b>AI胜率浮动条</b>（兜底区域自动跟着外扩）、结算「开始」按钮、段位数字、主界面「传统对战」、选择套牌标题、9 个卡组、四个模式盾牌（狂野/标准/休闲）；✛ <b>阶段判定点</b>是只读参考，点不到炉石的地方照常点得到。<br>🧭 右上角<b>日志浮窗</b>的<b>「校准」</b>按钮打开的是同一个窗口（再点一次收起）。</div>
-
-      </section>
+      </div>
+      <div class="row-note desc">按「对方有哪些卡」识别卡组，命中就立刻投降：卡名输入中文会弹候选；每组可选且/或/非并多层嵌套；所有条件只判对方。点右上「展开」编辑规则。</div>
+    </section>
+
+    <section class="group" id="cardHuman">
+      <h2 class="group-title"><span>活人感</span><span class="gt-sub">随机延时与鼠标小动作</span>
+        <span class="gt-tools"><button id="btnSaveHumanLike" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+      <div class="row">
+        <div class="row-label">启用</div>
+        <div class="row-control"><input id="chkHumanLike" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">看卡牌</div>
+        <div class="row-control"><input id="chkHlHand" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">随机延时下限（秒）</div>
+        <div class="row-control"><input id="inpHlMin" type="number" min="0" max="60" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">随机延时上限（秒）</div>
+        <div class="row-control"><input id="inpHlMax" type="number" min="0" max="60" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">悬停下限（秒）</div>
+        <div class="row-control"><input id="inpHlHoverMin" type="number" min="0.05" max="30" step="0.05"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">悬停上限（秒）</div>
+        <div class="row-control"><input id="inpHlHoverMax" type="number" min="0.05" max="30" step="0.05"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">看随从</div>
+        <div class="row-control"><input id="chkHlMinion" type="checkbox"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">随从悬停下限（秒）</div>
+        <div class="row-control"><input id="inpHlMinionMin" type="number" min="0.05" max="30" step="0.05"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">随从悬停上限（秒）</div>
+        <div class="row-control"><input id="inpHlMinionMax" type="number" min="0.05" max="30" step="0.05"></div>
+      </div>
+      <div class="row-note desc">全程只移动鼠标、绝不点击：操作后先随机等一段再出牌，等待期间在手牌区随手停；对手新随从出现时悬停一下。关掉「看卡牌」连随机延时一起取消。默认关闭，下一局生效。</div>
+    </section>
+
+    <section class="group" id="cardRegions">
+      <h2 class="group-title"><span>校准</span><span class="gt-sub">屏幕识别区域</span></h2>
+      <div class="row">
+        <div class="row-label">校准窗口</div>
+        <div class="row-control"><button id="btnCalibrate" class="btn btn-primary" type="button">📐 打开校准</button></div>
+      </div>
+      <div class="row-note desc">自动化没跑时打开：屏幕上只画当前目标那一个框 + 屏幕正中央的目标条 + 右侧推荐区域实时 OCR 预览，并提示<b>「请对齐相应UI」</b>。<b>Tab</b> 切换目标、拖框/拖手柄改位置大小、<b>S</b> 保存、<b>Esc</b> 退出。框外画面<b>鼠标穿透</b>，可边看游戏边调。拖动/缩放炉石窗口时框会实时跟着走，校准一次即可。<br>🎯 13 个目标：<b>盒子推荐面板</b>、换牌推荐面板（最多 4 张留牌）、<b>换牌确认按钮</b>、<b>AI胜率浮动条</b>（兜底区域自动跟着外扩）、结算「开始」按钮、段位数字、主界面「传统对战」、选择套牌标题、9 个卡组、四个模式盾牌（狂野/标准/休闲）；✛ <b>阶段判定点</b>是只读参考，点不到炉石的地方照常点得到。<br>🧭 右上角<b>日志浮窗</b>的<b>「校准」</b>按钮打开的是同一个窗口（再点一次收起）。</div>
+    </section>
+
+    <section class="group" id="cardDelay">
+      <h2 class="group-title"><span>延时</span><span class="gt-sub">对局内的等待时间</span>
+        <span class="gt-tools"><button id="btnSaveDelays" class="btn btn-ghost btn-small" type="button">保存</button></span></h2>
+      <div class="row">
+        <div class="row-label">换牌前等待（秒）</div>
+        <div class="row-control"><input id="inpReadyDelay" type="number" min="0" max="120" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">识别后缓冲（秒）</div>
+        <div class="row-control"><input id="inpPostOcrDelay" type="number" min="0" max="30" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">换牌重试间隔（秒）</div>
+        <div class="row-control"><input id="inpRetryDelay" type="number" min="0" max="60" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">每张开局卡（秒）</div>
+        <div class="row-control"><input id="inpFirstTurnPerCard" type="number" min="0" max="20" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">每回合前（秒）</div>
+        <div class="row-control"><input id="inpPreDelay" type="number" min="0" max="60" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">操作后（秒）</div>
+        <div class="row-control"><input id="inpPostDelay" type="number" min="0" max="10" step="0.25"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">抽牌额外（秒/张）</div>
+        <div class="row-control"><input id="inpDrawDelay" type="number" min="0" max="20" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">选目标延时（秒）</div>
+        <div class="row-control"><input id="inpChoiceTargetDelay" type="number" min="0" max="5" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div class="row-label">OCR 缩放</div>
+        <div class="row-control"><input id="inpOcrScale" type="number" min="0.5" max="4" step="0.1"></div>
+      </div>
+      <div class="row block">
+        <div class="row-label">当前时序</div>
+        <div class="row-control" style="justify-content:flex-start"><span class="status" id="delayHint">由服务端配置返回</span></div>
+      </div>
+      <div class="row-note desc">抽牌额外延时：回合内抽到牌时每张额外等待；<b>回合开始那 1 张常规抽牌不算</b>。选目标延时用于鲍勃「招募随从」这类牌：选完选项到点它自带目标之间的等待。</div>
+    </section>
+
+    <section class="group" id="cardSelfcheck">
+      <h2 class="group-title"><span>环境自检</span><span class="gt-sub">依赖与权限体检</span>
+        <span class="gt-tools">
+          <button id="btnSelfcheck" class="btn btn-ghost btn-small" type="button">重新自检</button>
+          <button id="btnSelfcheckToggle" class="btn btn-ghost btn-small" type="button">收起</button>
+        </span>
+      </h2>
+      <div style="display:flex;align-items:flex-start;gap:6px;padding:4px 6px 0">
+        <span id="selfcheckBadge" class="chip" style="flex:none">自检中…</span>
+        <span id="selfcheckSummary" class="status">正在自检：Python 版本 / 依赖包 / 分辨率与缩放…</span>
+      </div>
+      <div id="selfcheckBody">
+        <div id="selfcheckList" class="check-list"></div>
+        <div class="row-note desc">脚本第一次启动时会自动自检一遍，这里显示的就是那次结果，随时可点 [重新自检] 重跑。✅ 达标 · ⚠️ 与推荐值不同（还能跑）· ❌ 缺失或不满足（必须修）。<b>Python 必须是 3.12 的 64 位版本</b>：项目实测基线是 3.12，OCR 后端（RapidOCR + ONNX Runtime）也只在这个环境验证过，3.13+ 与 3.11 及以下均未在实测范围内（推荐 <code>conda create -n HTL python=3.12 -y</code>）。</div>
+      </div>
+    </section>
   </div>
 
   <div class="bottom">
-      <section class="group" id="cardSelfcheck">
-
-        <h2 class="group-title">
-
-          <span>环境自检</span>
-
-          <span class="gt-tools">
-
-            <span id="selfcheckBadge" class="chip">自检中…</span>
-
-            <button id="btnSelfcheck" class="btn btn-ghost btn-small" type="button">重新自检</button>
-
-            <button id="btnSelfcheckToggle" class="btn btn-ghost btn-small" type="button">收起</button>
-
-          </span>
-
-        </h2>
-
-        <div id="selfcheckSummary" class="status" style="padding:7px 2px 0">正在自检：Python 版本 / 依赖包 / 分辨率与缩放…</div>
-
-        <div id="selfcheckBody">
-
-          <div id="selfcheckList" class="check-list"></div>
-
-          <div class="row-note desc">脚本第一次启动时会自动自检一遍，这里显示的就是那次结果，随时可点 [重新自检] 重跑。✅ 达标 · ⚠️ 与推荐值不同（还能跑）· ❌ 缺失或不满足（必须修）。<b>Python 必须是 3.12 的 64 位版本</b>：项目实测基线是 3.12，OCR 后端（RapidOCR + ONNX Runtime）也只在这个环境验证过，3.13+ 与 3.11 及以下均未在实测范围内（推荐 <code>conda create -n HTL python=3.12 -y</code>）。</div>
-
-        </div>
-
-      </section>
-
-      <section class="group">
-
-        <h2 class="group-title">
-
-          <span>实时日志</span>
-
-          <span class="gt-tools">
-
-            <label class="row-control" style="font-size:12px;gap:6px;color:var(--muted)">
-
-              <input type="checkbox" id="chkAutoscroll" checked>自动滚动
-
-            </label>
-
-            <button id="btnClearLog" class="btn btn-ghost btn-small" type="button">清空</button>
-
-          </span>
-
-        </h2>
-
-        <div id="logBox" class="log-box" style="margin-top:8px"></div>
-
-      </section>
+    <section class="group">
+      <h2 class="group-title"><span>实时日志</span><span class="gt-sub">运行过程</span>
+        <span class="gt-tools">
+          <label class="autoscroll"><input type="checkbox" id="chkAutoscroll" checked>自动滚动</label>
+          <button id="btnClearLog" class="btn btn-ghost btn-small" type="button">清空</button>
+        </span>
+      </h2>
+      <div id="logBox" class="log-box"></div>
+    </section>
   </div>
 
   <div class="footer">HSLegendArriver · 仅用于技术研究与代码交流 · <a href="https://github.com/hyman-wang/lushi_auto" target="_blank" rel="noopener noreferrer">github.com/hyman-wang/lushi_auto</a></div>
